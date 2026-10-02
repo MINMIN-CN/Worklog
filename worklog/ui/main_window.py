@@ -1,0 +1,305 @@
+"""主窗口：侧边导航 + 页面堆栈 + 系统托盘。"""
+
+from __future__ import annotations
+
+from PySide6.QtCore import QTimer
+from PySide6.QtWidgets import (
+    QApplication,
+    QHBoxLayout,
+    QLabel,
+    QListWidget,
+    QMainWindow,
+    QMenu,
+    QMessageBox,
+    QPushButton,
+    QStackedWidget,
+    QSystemTrayIcon,
+    QVBoxLayout,
+    QWidget,
+)
+
+from .. import APP_NAME, __version__
+from ..config import DATA_DIR
+from ..updater import download_installer, fetch_manifest, is_newer, launch_update
+from .pages import (
+    ReportsPage,
+    SettingsPage,
+    StatsPage,
+    TimelinePage,
+    TodayPage,
+    TodosPage,
+)
+from .widgets import Task, make_icon, refresh_style
+
+STATUS_LABELS = {
+    "recording": "记录中",
+    "paused": "已暂停",
+    "idle": "离开中",
+    "analyzing": "AI 分析中",
+    "stopped": "已停止",
+}
+
+
+class MainWindow(QMainWindow):
+    def __init__(self, ctx, parent: QWidget | None = None):
+        super().__init__(parent)
+        self.ctx = ctx
+        self._really_quit = False
+        self._tray_notified = False
+
+        self.setWindowTitle(f"{APP_NAME} · 工作记录与日报助手")
+        self.resize(1240, 820)
+        self.setWindowIcon(make_icon())
+
+        root = QWidget()
+        root.setObjectName("root")
+        root_layout = QHBoxLayout(root)
+        root_layout.setContentsMargins(0, 0, 0, 0)
+        root_layout.setSpacing(0)
+
+        self.nav = QListWidget()
+        self.nav.setObjectName("nav")
+        self.nav.setFixedWidth(150)
+        for name in ["今日", "时间线", "统计", "报告", "待办", "设置"]:
+            self.nav.addItem(name)
+        root_layout.addWidget(self.nav)
+
+        right = QVBoxLayout()
+        right.setContentsMargins(0, 0, 0, 0)
+        right.setSpacing(0)
+
+        topbar = QWidget()
+        topbar_layout = QHBoxLayout(topbar)
+        topbar_layout.setContentsMargins(18, 12, 18, 6)
+        topbar_layout.setSpacing(8)
+
+        self.pill = QLabel("已停止")
+        self.pill.setObjectName("pill")
+        self.pill.setProperty("state", "stopped")
+        self.message_label = QLabel("")
+        self.message_label.setObjectName("muted")
+        self.capture_btn = QPushButton("立即记录")
+        self.capture_btn.setObjectName("ghost")
+        self.capture_btn.clicked.connect(ctx.engine.capture_now)
+        self.pause_btn = QPushButton("暂停记录")
+        self.pause_btn.setObjectName("primary")
+        self.pause_btn.clicked.connect(ctx.engine.toggle_pause)
+
+        topbar_layout.addWidget(self.pill)
+        topbar_layout.addWidget(self.message_label)
+        topbar_layout.addStretch(1)
+        topbar_layout.addWidget(self.capture_btn)
+        topbar_layout.addWidget(self.pause_btn)
+        right.addWidget(topbar)
+
+        self.stack = QStackedWidget()
+        self.today_page = TodayPage(ctx)
+        self.timeline_page = TimelinePage(ctx)
+        self.stats_page = StatsPage(ctx)
+        self.reports_page = ReportsPage(ctx)
+        self.todos_page = TodosPage(ctx)
+        self.settings_page = SettingsPage(ctx)
+        for page in (
+            self.today_page,
+            self.timeline_page,
+            self.stats_page,
+            self.reports_page,
+            self.todos_page,
+            self.settings_page,
+        ):
+            self.stack.addWidget(page)
+        right.addWidget(self.stack, 1)
+
+        root_layout.addLayout(right, 1)
+        self.setCentralWidget(root)
+
+        self.nav.currentRowChanged.connect(self._on_nav_changed)
+        self.nav.setCurrentRow(0)
+
+        self.today_page.open_reports.connect(self._open_reports)
+        self.today_page.open_settings.connect(lambda: self.nav.setCurrentRow(5))
+        self.today_page.data_changed.connect(self._refresh_all)
+        self.timeline_page.data_changed.connect(self._refresh_all)
+        self.todos_page.data_changed.connect(self._refresh_all)
+
+        self._setup_tray()
+
+        ctx.engine.status_changed.connect(self._on_status)
+        ctx.engine.record_added.connect(self._on_record_changed)
+        ctx.engine.record_updated.connect(self._on_record_changed)
+        ctx.engine.error.connect(self._show_message)
+
+        self._timer = QTimer(self)
+        self._timer.setInterval(60000)
+        self._timer.timeout.connect(self._refresh_current)
+        self._timer.start()
+
+        # 安装程序升级前会写入 .installer_close 标记，应用看到后主动退出以便替换文件
+        self._installer_timer = QTimer(self)
+        self._installer_timer.setInterval(2000)
+        self._installer_timer.timeout.connect(self._check_installer_close)
+        self._installer_timer.start()
+
+        if ctx.engine.running:
+            self._on_status("paused" if ctx.engine.paused else "recording")
+        else:
+            self._on_status("stopped")
+
+        QTimer.singleShot(4000, self._auto_check_update)
+
+    # ------------------------------------------------------------------ 更新
+    def _check_installer_close(self) -> None:
+        import time
+
+        marker = DATA_DIR / ".installer_close"
+        if not marker.exists():
+            return
+        try:
+            fresh = time.time() - marker.stat().st_mtime < 600
+        except Exception:
+            fresh = False
+        if not fresh:
+            return
+        try:
+            marker.unlink()
+        except Exception:
+            pass
+        self._really_quit = True
+        self.close()
+
+    def _auto_check_update(self) -> None:
+        enabled = bool(self.ctx.cfg.get("update", "auto_check", default=False))
+        source = (self.ctx.cfg.get("update", "manifest_url", default="") or "").strip()
+        if not enabled or not source:
+            return
+        task = Task(lambda: fetch_manifest(source), self)
+        task.done.connect(self._on_manifest_checked)
+        task.fail.connect(lambda message: self._show_message(f"检查更新失败：{message}"))
+        self._update_task = task
+        task.start()
+
+    def _on_manifest_checked(self, manifest: dict) -> None:
+        remote = str(manifest.get("version") or "")
+        if not is_newer(remote):
+            return
+        notes = str(manifest.get("notes") or "").strip()
+        message = f"发现新版本 v{remote}（当前 v{__version__}）"
+        if notes:
+            message += f"\n\n{notes}"
+        message += "\n\n是否立即下载并自动安装？安装完成后程序会自动重新打开。"
+        if QMessageBox.question(self, "检查更新", message) != QMessageBox.Yes:
+            return
+        url = str(manifest.get("url") or "")
+        if not url:
+            self._show_message("更新清单缺少下载地址 url")
+            return
+        self._show_message("正在下载新版本…")
+        task = Task(lambda: download_installer(url), self)
+        task.done.connect(self._install_downloaded)
+        task.fail.connect(lambda message: self._show_message(f"下载失败：{message}"))
+        self._update_task = task
+        task.start()
+
+    def _install_downloaded(self, path) -> None:
+        try:
+            launch_update(path)
+        except Exception as exc:
+            self._show_message(f"更新启动失败：{exc}")
+            return
+        QApplication.quit()
+
+    # ------------------------------------------------------------------ 导航
+    def _on_nav_changed(self, row: int) -> None:
+        self.stack.setCurrentIndex(row)
+        page = self.stack.currentWidget()
+        if hasattr(page, "refresh"):
+            page.refresh()
+
+    def _open_reports(self, kind: str) -> None:
+        self.reports_page.prefill(kind)
+        self.nav.setCurrentRow(3)
+
+    def _refresh_current(self) -> None:
+        page = self.stack.currentWidget()
+        if hasattr(page, "refresh"):
+            page.refresh()
+
+    def _refresh_all(self) -> None:
+        self.today_page.refresh()
+        self.timeline_page.refresh()
+        self.stats_page.refresh()
+
+    # ------------------------------------------------------------------ 引擎
+    def _on_status(self, status: str) -> None:
+        base = (status or "stopped").split(":", 1)[0]
+        label = STATUS_LABELS.get(base, "异常")
+        self.pill.setText(label)
+        self.pill.setProperty("state", base if base in STATUS_LABELS else "error")
+        refresh_style(self.pill)
+        paused = base == "paused"
+        self.pause_btn.setText("继续记录" if paused else "暂停记录")
+        self.tray_pause_action.setText("继续记录" if paused else "暂停记录")
+
+    def _on_record_changed(self, _payload: dict) -> None:
+        page = self.stack.currentWidget()
+        if page in (self.today_page, self.timeline_page, self.stats_page):
+            page.refresh()
+
+    def _show_message(self, text: str) -> None:
+        self.message_label.setText(text)
+        QTimer.singleShot(8000, lambda: self.message_label.setText(""))
+
+    # ------------------------------------------------------------------ 托盘
+    def _setup_tray(self) -> None:
+        self.tray = QSystemTrayIcon(make_icon(), self)
+        self.tray.setToolTip(f"{APP_NAME} · 工作记录与日报助手")
+        menu = QMenu()
+        show_action = menu.addAction("显示主窗口")
+        show_action.triggered.connect(self._show_window)
+        self.tray_pause_action = menu.addAction("暂停记录")
+        self.tray_pause_action.triggered.connect(self.ctx.engine.toggle_pause)
+        capture_action = menu.addAction("立即记录")
+        capture_action.triggered.connect(self.ctx.engine.capture_now)
+        menu.addSeparator()
+        quit_action = menu.addAction("退出")
+        quit_action.triggered.connect(self._quit)
+        self.tray.setContextMenu(menu)
+        self.tray.activated.connect(self._on_tray_activated)
+        self.tray.show()
+
+    def _on_tray_activated(self, reason) -> None:
+        if reason in (QSystemTrayIcon.Trigger, QSystemTrayIcon.DoubleClick):
+            if self.isVisible():
+                self.hide()
+            else:
+                self._show_window()
+
+    def _show_window(self) -> None:
+        self.showNormal()
+        self.raise_()
+        self.activateWindow()
+
+    def _quit(self) -> None:
+        self._really_quit = True
+        self.close()
+
+    # ------------------------------------------------------------------ 关闭
+    def closeEvent(self, event) -> None:
+        close_to_tray = self.ctx.cfg.get("ui", "close_to_tray", default=True)
+        if not self._really_quit and close_to_tray and self.tray.isVisible():
+            event.ignore()
+            self.hide()
+            if not self._tray_notified:
+                self.tray.showMessage(
+                    APP_NAME,
+                    "已最小化到托盘，记录继续运行。",
+                    QSystemTrayIcon.Information,
+                    3000,
+                )
+                self._tray_notified = True
+            return
+        self.ctx.engine.stop()
+        if self.ctx.api:
+            self.ctx.api.stop()
+        event.accept()
+        QApplication.quit()

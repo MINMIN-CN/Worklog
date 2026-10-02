@@ -1,0 +1,20 @@
+[project]
+name = "worklog"
+version = "0.3.0"
+description = "本地优先的 AI 工作记录与日报助手（个人版）"
+requires-python = ">=3.11"
+dependencies = [
+    "PySide6-Essentials>=6.7.0",
+    "mss>=9.0.1",
+    "Pillow>=10.3.0",
+    "psutil>=5.9.8",
+    "httpx>=0.27.0",
+]
+
+[dependency-groups]
+dev = [
+    "pyinstaller>=6.10",
+]
+
+[tool.uv]
+package = false
