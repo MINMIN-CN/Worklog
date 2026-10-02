@@ -51,6 +51,7 @@ Open "Settings → AI Model Endpoint" and complete three steps:
 Once a provider is selected, the endpoint URL and model name are filled in automatically and usually need no changes. To use a custom endpoint or model name, expand "**Advanced settings**" and edit them manually. On first launch you'll also see a "Go to settings" prompt button on the "Today" page.
 
 > 💡 **DeepSeek already supports image input natively** (`deepseek-flash`, since 2026-09), and it's this tool's default preset: direct access from mainland China, low cost, no proxy required.
+> ⚙️ DeepSeek's "thinking mode" consumes the output budget and can leave reports empty; this tool **disables it by default** when using DeepSeek for stability. You can turn it back on in "Advanced settings → Thinking mode".
 > 💡 Model names may change as providers update. If the test says "model not found", switch to the provider's latest model name under advanced settings.
 
 Configuration is saved to `config.json` in the data directory and can also be edited directly.
@@ -150,7 +151,7 @@ Update manifest format:
 3. Publish a Release with the GitHub CLI, uploading the installer and manifest as assets:
 
 ```bat
-gh release create v0.5.1 "dist\installer\WorkLog-Setup-0.5.1.exe" "update\manifest.json" ^
+gh release create v0.5.2 "dist\installer\WorkLog-Setup-0.5.2.exe" "update\manifest.json" ^
   --title "WorkLog v0.5.0" --notes "Release notes"
 ```
 
@@ -230,7 +231,7 @@ packaging\build.bat
 
 It runs in sequence: generate icons → PyInstaller packaging (onedir, output to `dist\WorkLog\`) → Inno Setup to build the installer.
 
-Output: `dist\installer\WorkLog-Setup-0.5.1.exe`. Installer features:
+Output: `dist\installer\WorkLog-Setup-0.5.2.exe`. Installer features:
 
 - Per-user install by default (no administrator rights required), at `%LOCALAPPDATA%\Programs\工作小记`
 - The installer wizard supports **Simplified Chinese / English** and matches the system language automatically

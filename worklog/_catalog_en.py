@@ -343,5 +343,17 @@ EN.update(
         "正在下载 {done}/{total} MB · {speed}/s · {source}": "Downloading {done}/{total} MB · {speed}/s · {source}",
         "已取消下载": "Download cancelled",
         "无法连接任何下载线路，请检查网络后重试": "Could not reach any download source. Check your network and try again.",
+        # v0.5.2：思考模式与空内容处理
+        "思考模式": "Thinking mode",
+        "思考强度": "Reasoning effort",
+        "默认（不指定）": "Default (not set)",
+        "关闭（更快更稳定）": "Off (faster, more stable)",
+        "开启": "On",
+        "低": "Low",
+        "高": "High",
+        "最高": "Max",
+        "模型把输出预算都用在思考上了（未返回内容）。请在设置 → 高级设置中关闭「思考模式」后重试。": "The model spent the whole output budget on reasoning and returned no content. Turn off \"Thinking mode\" in Settings → Advanced and try again.",
+        "模型返回了空内容，请重试或在设置中调整模型。": "The model returned empty content. Please retry or adjust the model in Settings.",
+        "模型输出被截断（可能把预算用在思考上），已自动重试…": "Model output was truncated (likely spent on reasoning); retrying automatically…",
     }
 )

@@ -636,6 +636,15 @@ class ReportsPage(QWidget):
 
     def _on_generated(self, result) -> None:
         kind, start, end, _label, title, content, template_name = result
+        if not (content or "").strip():
+            self.generate_btn.setEnabled(True)
+            self.status_label.setText(i18n.tr("生成失败"))
+            QMessageBox.warning(
+                self,
+                i18n.tr("生成失败"),
+                i18n.tr("模型返回了空内容，请重试或在设置中调整模型。"),
+            )
+            return
         report_id = self.ctx.db.add_report(kind, start, end, title, content, template_name)
         try:
             filename = f"{kind}_{start}_{end}.md"
@@ -1013,6 +1022,25 @@ class SettingsPage(QWidget):
         self.quality_spin = QSpinBox()
         self.quality_spin.setRange(40, 95)
         self.quality_spin.setValue(int(cfg.get("api", "jpeg_quality", default=70)))
+        self.thinking_combo = QComboBox()
+        self.thinking_combo.addItem("默认（不指定）", "auto")
+        self.thinking_combo.addItem("关闭（更快更稳定）", "disabled")
+        self.thinking_combo.addItem("开启", "enabled")
+        thinking_index = self.thinking_combo.findData(
+            cfg.get("api", "thinking", default="auto")
+        )
+        if thinking_index >= 0:
+            self.thinking_combo.setCurrentIndex(thinking_index)
+        self.effort_combo = QComboBox()
+        self.effort_combo.addItem("默认（不指定）", "auto")
+        self.effort_combo.addItem("低", "low")
+        self.effort_combo.addItem("高", "high")
+        self.effort_combo.addItem("最高", "max")
+        effort_index = self.effort_combo.findData(
+            cfg.get("api", "reasoning_effort", default="auto")
+        )
+        if effort_index >= 0:
+            self.effort_combo.setCurrentIndex(effort_index)
         self.extra_edit = QPlainTextEdit(cfg.get("api", "extra_instruction", default="") or "")
         self.extra_edit.setFixedHeight(56)
         self.extra_edit.setPlaceholderText("补充给模型的指令，例如：我在做电商项目，分类时把「直播」归到「运营」")
@@ -1022,6 +1050,8 @@ class SettingsPage(QWidget):
         advanced_form.addRow("请求超时", self.timeout_spin)
         advanced_form.addRow("截图最大宽度", self.max_width_spin)
         advanced_form.addRow("JPEG 质量", self.quality_spin)
+        advanced_form.addRow("思考模式", self.thinking_combo)
+        advanced_form.addRow("思考强度", self.effort_combo)
         advanced_form.addRow("补充指令", self.extra_edit)
         self.advanced_widget.setVisible(False)
         api_card.add(self.advanced_widget)
@@ -1239,6 +1269,9 @@ class SettingsPage(QWidget):
                 self.vision_model.setText(provider.vision_model)
             if provider.text_model:
                 self.text_model.setText(provider.text_model)
+            thinking_index = self.thinking_combo.findData(provider.thinking or "auto")
+            if thinking_index >= 0:
+                self.thinking_combo.setCurrentIndex(thinking_index)
         # 兼容老配置：字段为空时补上预设值
         if not self.base_url.text().strip():
             self.base_url.setText(provider.base_url)
@@ -1406,6 +1439,8 @@ class SettingsPage(QWidget):
                     "timeout": int(self.timeout_spin.value()),
                     "max_image_width": int(self.max_width_spin.value()),
                     "jpeg_quality": int(self.quality_spin.value()),
+                    "thinking": self.thinking_combo.currentData() or "auto",
+                    "reasoning_effort": self.effort_combo.currentData() or "auto",
                     "extra_instruction": self.extra_edit.toPlainText().strip(),
                 },
                 "capture": {
@@ -1459,13 +1494,24 @@ class SettingsPage(QWidget):
         )
         separator = "; " if i18n.is_english() else "；"
 
+        thinking = self.thinking_combo.currentData() or "auto"
+        if thinking == "auto" and (self.provider_combo.currentData() or "") == "deepseek":
+            thinking = "disabled"
+        effort = self.effort_combo.currentData() or "auto"
+
         def run():
             import base64
             import io
 
             from PIL import Image as PILImage
 
-            client = AIClient(base_url, api_key, timeout)
+            client = AIClient(
+                base_url,
+                api_key,
+                timeout,
+                thinking=thinking,
+                reasoning_effort=effort,
+            )
             notes: list[str] = []
             try:
                 client.chat(

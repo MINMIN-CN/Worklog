@@ -127,6 +127,8 @@ DEFAULT_CONFIG: dict = {
         "api_key": "",
         "vision_model": "deepseek-flash",
         "text_model": "deepseek-flash",
+        "thinking": "auto",
+        "reasoning_effort": "auto",
         "timeout": 120,
         "max_image_width": 1280,
         "jpeg_quality": 70,

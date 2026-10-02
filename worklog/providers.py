@@ -18,6 +18,7 @@ class Provider:
     text_model: str
     hint: str = ""
     key_placeholder: str = "粘贴你的 API Key"
+    thinking: str = "auto"
 
 
 PROVIDERS: list[Provider] = [
@@ -27,7 +28,9 @@ PROVIDERS: list[Provider] = [
         "https://api.deepseek.com",
         "deepseek-flash",
         "deepseek-flash",
-        "官方 API 已原生支持图片输入，国内直连、价格便宜；在 platform.deepseek.com 创建 API Key。",
+        "官方 API 已原生支持图片输入，国内直连、价格便宜；在 platform.deepseek.com 创建 API Key。"
+        "默认关闭思考模式（可在高级设置中开启），避免报告生成时输出被思考占用。",
+        thinking="disabled",
     ),
     Provider(
         "dashscope",

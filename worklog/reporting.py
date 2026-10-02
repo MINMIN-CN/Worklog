@@ -173,7 +173,7 @@ def generate_report(
             {"role": "user", "content": prompt},
         ],
         model=model or cfg.get("api", "text_model", default="gpt-4o-mini"),
-        max_tokens=2000,
+        max_tokens=3000,
         temperature=0.4,
     )
     return content.strip()

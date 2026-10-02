@@ -52,6 +52,7 @@ uv run python -m worklog
 选好服务商后接口地址和模型名会自动填好，一般不用改。需要自定义接口或模型名时，展开「**高级设置**」手动修改即可。首次打开还会在「今日」页看到「去设置」的提示按钮。
 
 > 💡 **DeepSeek 已原生支持图片输入**（`deepseek-flash`，2026-09 起），本工具默认预设就是它：国内直连、便宜、无需代理。
+> ⚙️ DeepSeek 的「思考模式」会占用输出预算，可能导致日报/周报内容为空；本工具在 DeepSeek 下**默认关闭思考模式**（更稳定），如需开启可在「高级设置 → 思考模式」中调整。
 > 💡 模型名可能随服务商更新，如果测试提示「模型不存在」，在高级设置里换成该服务商最新的模型名即可。
 
 配置保存在数据目录的 `config.json`，也可以直接编辑。
@@ -151,7 +152,7 @@ https://github.com/MINMIN-CN/Worklog/releases/latest/download/manifest.json
 3. 用 GitHub CLI 发布 Release，把安装包和 manifest 作为资源上传：
 
 ```bat
-gh release create v0.5.1 "dist\installer\WorkLog-Setup-0.5.1.exe" "update\manifest.json" ^
+gh release create v0.5.2 "dist\installer\WorkLog-Setup-0.5.2.exe" "update\manifest.json" ^
   --title "工作小记 v0.5.1" --notes "更新说明"
 ```
 
@@ -232,7 +233,7 @@ packaging\build.bat
 
 它会依次：生成图标 → PyInstaller 打包（onedir，输出 `dist\WorkLog\`）→ Inno Setup 生成安装包。
 
-产物：`dist\installer\WorkLog-Setup-0.5.1.exe`，安装包特性：
+产物：`dist\installer\WorkLog-Setup-0.5.2.exe`，安装包特性：
 
 - 默认按用户安装（无需管理员权限），路径 `%LOCALAPPDATA%\Programs\工作小记`
 - 安装向导支持**简体中文 / English**，自动匹配系统语言

@@ -70,15 +70,35 @@ def _user_text(payload: dict) -> tuple[str, bool]:
 
 
 class MockHandler(BaseHTTPRequestHandler):
+    counters: dict = {}
+    last_payload: dict = {}
+
     def log_message(self, fmt, *args):
         return
 
     def do_POST(self):
         length = int(self.headers.get("Content-Length") or 0)
         payload = json.loads(self.rfile.read(length).decode("utf-8"))
+        MockHandler.last_payload = payload
+        model = str(payload.get("model") or "")
         text, has_image = _user_text(payload)
 
-        if has_image:
+        finish_reason = "stop"
+        reasoning = ""
+        if model == "empty-length-model":
+            content = ""
+            finish_reason = "length"
+            reasoning = "thinking for a very long time"
+        elif model == "retry-model":
+            count = MockHandler.counters.get("retry", 0) + 1
+            MockHandler.counters["retry"] = count
+            if count == 1:
+                content = ""
+                finish_reason = "length"
+                reasoning = "first attempt exhausted the budget"
+            else:
+                content = "OK"
+        elif has_image:
             content = VISION_JSON
         elif "待办事项" in text or "提取其中" in text:
             content = TODOS_JSON
@@ -89,8 +109,15 @@ class MockHandler(BaseHTTPRequestHandler):
         else:
             content = "OK"
 
+        message: dict = {"role": "assistant", "content": content}
+        if reasoning:
+            message["reasoning_content"] = reasoning
         body = json.dumps(
-            {"choices": [{"message": {"role": "assistant", "content": content}}]},
+            {
+                "choices": [
+                    {"message": message, "finish_reason": finish_reason}
+                ]
+            },
             ensure_ascii=False,
         ).encode("utf-8")
         self.send_response(200)
@@ -156,6 +183,36 @@ def main() -> int:
     classified = classify_text(client, "Code.exe", "main.py", "2026-10-02 10:00:00", cfg)
     assert classified["category"] == "开发", classified
     print("文本补分析: OK")
+
+    # 思考模式：空内容要报错，被长度截断要自动翻倍重试
+    from worklog.ai import AIError
+
+    try:
+        client.chat(
+            [{"role": "user", "content": "hi"}],
+            model="empty-length-model",
+            max_tokens=100,
+        )
+        raise AssertionError("空内容没有报错")
+    except AIError as exc:
+        assert "思考" in str(exc) or "空" in str(exc), str(exc)
+    print("空内容处理: OK")
+
+    reply = client.chat(
+        [{"role": "user", "content": "hi"}], model="retry-model", max_tokens=100
+    )
+    assert reply == "OK", reply
+    print("截断自动重试: OK")
+
+    client_thinking = AIClient(
+        "http://127.0.0.1:18999/v1", "test-key", 30, thinking="disabled"
+    )
+    client_thinking.chat(
+        [{"role": "user", "content": "hi"}], model="mock-text", max_tokens=10
+    )
+    assert MockHandler.last_payload.get("thinking") == {"type": "disabled"}
+    client_thinking.close()
+    print("思考模式参数透传: OK")
 
     server.shutdown()
     print("\n全链路测试通过。数据目录:", TEMP_DIR)
