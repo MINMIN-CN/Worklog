@@ -117,32 +117,46 @@ def download_installer(
 def launch_update(installer: str | Path, restart: bool = True) -> Path:
     """退出当前程序后静默运行安装包升级，完成后重新启动应用。
 
-    通过一个临时 cmd 脚本等待本进程退出，再执行安装包（/SILENT），
-    最后重新启动应用。返回脚本路径。
+    通过一个带 BOM 的 UTF-8 PowerShell 脚本完成：等待本进程退出 →
+    运行安装包（/SILENT）→ 重新启动应用。
+    使用 PowerShell 而不是 cmd 批处理，避免中文/非 ASCII 安装路径乱码。
+    返回脚本路径。
     """
     installer = Path(installer)
     if not installer.exists():
         raise FileNotFoundError(f"安装包不存在：{installer}")
 
-    exe = Path(sys.executable)
     pid = os.getpid()
-    script = Path(tempfile.gettempdir()) / "worklog_update.cmd"
+    script = Path(tempfile.gettempdir()) / "worklog_update.ps1"
+
+    def quote(path: str | Path) -> str:
+        return str(path).replace("'", "''")
+
     lines = [
-        "@echo off",
-        "chcp 65001 >nul",
-        f'powershell -NoProfile -ExecutionPolicy Bypass -Command "try {{ Wait-Process -Id {pid} -Timeout 120 -ErrorAction Stop }} catch {{}}"',
-        f'"{installer}" /SILENT /SUPPRESSMSGBOXES /NORESTART',
+        "$ErrorActionPreference = 'SilentlyContinue'",
+        f"try {{ Wait-Process -Id {pid} -Timeout 120 -ErrorAction Stop }} catch {{}}",
+        f"& '{quote(installer)}' /SILENT /SUPPRESSMSGBOXES /NORESTART",
     ]
     if restart and getattr(sys, "frozen", False):
-        lines.append(f'start "" "{exe}" --wait-instance')
-    lines.append('del "%~f0"')
-    script.write_text("\r\n".join(lines) + "\r\n", encoding="utf-8")
+        lines.append(
+            f"Start-Process -FilePath '{quote(Path(sys.executable))}' "
+            "-ArgumentList '--wait-instance'"
+        )
+    lines.append("Remove-Item -LiteralPath $PSCommandPath -Force")
+    # UTF-8 BOM：Windows PowerShell 5.1 才能正确解析中文路径
+    script.write_text("\r\n".join(lines) + "\r\n", encoding="utf-8-sig")
 
-    flags = 0
-    flags |= getattr(subprocess, "DETACHED_PROCESS", 0)
+    flags = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
     flags |= getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
     subprocess.Popen(
-        ["cmd", "/c", str(script)],
+        [
+            "powershell.exe",
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(script),
+        ],
         creationflags=flags,
         close_fds=True,
     )

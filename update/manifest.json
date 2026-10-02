@@ -1,5 +1,5 @@
 {
-  "version": "0.4.1",
-  "url": "https://github.com/MINMIN-CN/Worklog/releases/download/v0.4.1/WorkLog-Setup-0.4.1.exe",
-  "notes": "修复：在安装了 HTTPS 根证书（企业代理/安全软件）的电脑上，更新检查可能因 SSL 证书验证失败而无法工作；现在改为使用 Windows 系统证书库，兼容性更好。"
+  "version": "0.4.2",
+  "url": "https://github.com/MINMIN-CN/Worklog/releases/download/v0.4.2/WorkLog-Setup-0.4.2.exe",
+  "notes": "修复应用内升级在中文/非 ASCII 安装路径下“重启应用失败”的问题：更新脚本改为 PowerShell（UTF-8 BOM），并修复静默启动方式。安装本身一直正常，数据不受影响。"
 }

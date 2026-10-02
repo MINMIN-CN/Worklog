@@ -146,8 +146,8 @@ https://github.com/MINMIN-CN/Worklog/releases/latest/download/manifest.json
 3. 用 GitHub CLI 发布 Release，把安装包和 manifest 作为资源上传：
 
 ```bat
-gh release create v0.4.1 "dist\installer\WorkLog-Setup-0.4.1.exe" "update\manifest.json" ^
-  --title "工作小记 v0.4.1" --notes "更新说明"
+gh release create v0.4.2 "dist\installer\WorkLog-Setup-0.4.2.exe" "update\manifest.json" ^
+  --title "工作小记 v0.4.2" --notes "更新说明"
 ```
 
 4. 应用会自动通过 `releases/latest/download/manifest.json` 发现新版本。
@@ -227,7 +227,7 @@ packaging\build.bat
 
 它会依次：生成图标 → PyInstaller 打包（onedir，输出 `dist\WorkLog\`）→ Inno Setup 生成安装包。
 
-产物：`dist\installer\WorkLog-Setup-0.4.1.exe`，安装包特性：
+产物：`dist\installer\WorkLog-Setup-0.4.2.exe`，安装包特性：
 
 - 默认按用户安装（无需管理员权限），路径 `%LOCALAPPDATA%\Programs\工作小记`
 - 可选创建桌面快捷方式、开机自启动
