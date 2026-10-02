@@ -9,6 +9,8 @@ import time
 
 import httpx
 
+from .net import default_verify
+
 
 class AIError(RuntimeError):
     pass
@@ -43,6 +45,7 @@ class AIClient:
         self.json_mode = bool(json_mode)
         self._client = httpx.Client(
             timeout=self.timeout,
+            verify=default_verify(),
             headers={
                 "Authorization": f"Bearer {self.api_key}",
                 "Content-Type": "application/json",

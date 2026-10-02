@@ -21,6 +21,7 @@ from pathlib import Path
 import httpx
 
 from . import __version__
+from .net import default_verify
 
 # 内置更新源：GitHub Releases 的 manifest.json 资源，始终指向最新版本
 DEFAULT_MANIFEST_URL = (
@@ -64,7 +65,12 @@ def fetch_manifest(source: str) -> dict:
     if not source:
         raise ValueError("未配置更新地址")
     if source.startswith(("http://", "https://")):
-        response = httpx.get(source, timeout=20, follow_redirects=True)
+        response = httpx.get(
+            source,
+            timeout=20,
+            follow_redirects=True,
+            verify=default_verify(),
+        )
         response.raise_for_status()
         data = response.json()
     else:
@@ -89,7 +95,13 @@ def download_installer(
     if not name.lower().endswith(".exe"):
         name += ".exe"
     dest = target_dir / name
-    with httpx.stream("GET", url, timeout=300, follow_redirects=True) as response:
+    with httpx.stream(
+        "GET",
+        url,
+        timeout=300,
+        follow_redirects=True,
+        verify=default_verify(),
+    ) as response:
         response.raise_for_status()
         total = int(response.headers.get("Content-Length") or 0)
         done = 0

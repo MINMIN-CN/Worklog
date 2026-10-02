@@ -274,6 +274,15 @@ def test_config_migration() -> None:
     assert custom.get("update", "manifest_url", default="") == "https://example.com/m.json"
 
 
+def test_net_verify() -> None:
+    import ssl
+
+    from worklog.net import default_verify
+
+    verify = default_verify()
+    assert verify is True or isinstance(verify, ssl.SSLContext)
+
+
 def test_repo_manifest() -> None:
     """仓库里的 update/manifest.json 必须是合法清单且地址可用。"""
     manifest_path = Path(__file__).resolve().parent.parent / "update" / "manifest.json"
@@ -420,6 +429,7 @@ check("provider presets", test_providers)
 check("legacy data migration", test_migration)
 check("updater", test_updater)
 check("config migration", test_config_migration)
+check("net verify", test_net_verify)
 check("repo manifest", test_repo_manifest)
 check("screen capture", test_capture)
 check("engine store merge", test_engine_store)
