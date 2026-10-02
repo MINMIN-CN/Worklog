@@ -20,7 +20,13 @@ from PySide6.QtWidgets import (
 
 from .. import APP_NAME, __version__
 from ..config import DATA_DIR
-from ..updater import download_installer, fetch_manifest, is_newer, launch_update
+from ..updater import (
+    download_installer,
+    fetch_manifest,
+    is_newer,
+    launch_update,
+    resolve_manifest_url,
+)
 from .pages import (
     ReportsPage,
     SettingsPage,
@@ -168,13 +174,14 @@ class MainWindow(QMainWindow):
         self.close()
 
     def _auto_check_update(self) -> None:
-        enabled = bool(self.ctx.cfg.get("update", "auto_check", default=False))
-        source = (self.ctx.cfg.get("update", "manifest_url", default="") or "").strip()
-        if not enabled or not source:
+        enabled = bool(self.ctx.cfg.get("update", "auto_check", default=True))
+        if not enabled:
             return
+        source = resolve_manifest_url(self.ctx.cfg)
         task = Task(lambda: fetch_manifest(source), self)
         task.done.connect(self._on_manifest_checked)
-        task.fail.connect(lambda message: self._show_message(f"检查更新失败：{message}"))
+        # 启动时检查失败（断网、无法访问等）静默忽略，不打扰用户
+        task.fail.connect(lambda _message: None)
         self._update_task = task
         task.start()
 

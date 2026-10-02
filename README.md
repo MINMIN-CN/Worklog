@@ -107,18 +107,25 @@ curl "http://127.0.0.1:8765/api/timeline?date=2026-10-02"
 
 > 无需先卸载旧版本，直接装新版本即可。
 
-### 应用内更新（自动下载安装）
+### 应用内自动更新（无需任何配置）
 
 「设置 → 关于与更新」里可以：
 
-- 点「检查更新」：读取更新地址，有新版本时提示并自动下载、静默安装、重启
+- 点「检查更新」：从本项目的 GitHub Releases 获取最新版本，有新版本时提示，一键下载、静默安装并自动重启
 - 点「选择安装包升级」：手动选择一个新版安装包，程序退出后自动升级并重启
-- 勾选「启动时自动检查更新」，配合下面的更新地址使用
+- 「启动时自动检查更新」默认开启；检查失败（断网、无法访问等）会静默跳过，不弹错误
 
-**更新地址**支持两种形式：
+**内置更新源**（普通用户不需要填写任何地址）：
 
-- http/https 链接（例如放在自己的对象存储、网盘直链、内网服务器上）
-- 本机 JSON 文件路径
+```
+https://github.com/MINMIN-CN/Worklog/releases/latest/download/manifest.json
+```
+
+如需自定义（例如自建镜像、内网分发），在数据目录 `config.json` 中修改：
+
+```json
+{ "update": { "manifest_url": "https://你的地址/manifest.json", "auto_check": true } }
+```
 
 更新清单（manifest）格式：
 
@@ -130,8 +137,18 @@ curl "http://127.0.0.1:8765/api/timeline?date=2026-10-02"
 }
 ```
 
-发布新版本时，把安装包和这个 JSON 传到任意可访问的位置，更新版本号即可。
-如果想给自己用，最简单的做法是把它们放到一个本地目录，更新地址填 JSON 的完整路径。
+### 发布新版本（开发者）
+
+1. 改版本号后运行 `packaging\build.bat` 生成安装包
+2. 更新 `update/manifest.json`（version、url、notes）
+3. 用 GitHub CLI 发布 Release，把安装包和 manifest 作为资源上传：
+
+```bat
+gh release create v0.4.0 "dist\installer\WorkLog-Setup-0.4.0.exe" "update\manifest.json" ^
+  --title "工作小记 v0.4.0" --notes "更新说明"
+```
+
+4. 应用会自动通过 `releases/latest/download/manifest.json` 发现新版本。
 
 ## 数据与备份
 
@@ -208,7 +225,7 @@ packaging\build.bat
 
 它会依次：生成图标 → PyInstaller 打包（onedir，输出 `dist\WorkLog\`）→ Inno Setup 生成安装包。
 
-产物：`dist\installer\WorkLog-Setup-0.3.0.exe`，安装包特性：
+产物：`dist\installer\WorkLog-Setup-0.4.0.exe`，安装包特性：
 
 - 默认按用户安装（无需管理员权限），路径 `%LOCALAPPDATA%\Programs\工作小记`
 - 可选创建桌面快捷方式、开机自启动

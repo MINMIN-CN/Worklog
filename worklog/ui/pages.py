@@ -44,7 +44,13 @@ from ..config import DATA_DIR, REPORTS_DIR
 from ..providers import all_providers, match_provider, provider_by_key
 from ..reporting import KIND_LABELS, build_timeline_text, generate_report, range_for
 from ..stats import compute_stats, format_duration
-from ..updater import download_installer, fetch_manifest, is_newer, launch_update
+from ..updater import (
+    download_installer,
+    fetch_manifest,
+    is_newer,
+    launch_update,
+    resolve_manifest_url,
+)
 from ..wininfo import monitor_count
 from .dialogs import RecordEditDialog
 from .widgets import (
@@ -1051,17 +1057,13 @@ class SettingsPage(QWidget):
         update_row.addWidget(self.pick_installer_btn)
         update_row.addWidget(self.update_status, 1)
         update_card.add_layout(update_row)
-        update_form = QFormLayout()
-        update_form.setSpacing(9)
-        self.update_url_edit = QLineEdit(cfg.get("update", "manifest_url", default="") or "")
-        self.update_url_edit.setPlaceholderText(
-            "更新清单地址：http(s) 链接或本地 json 文件路径，可留空"
-        )
-        self.auto_update_check = QCheckBox("启动时自动检查更新")
-        self.auto_update_check.setChecked(bool(cfg.get("update", "auto_check", default=False)))
-        update_form.addRow("更新地址", self.update_url_edit)
-        update_form.addRow("", self.auto_update_check)
-        update_card.add_layout(update_form)
+        self.auto_update_check = QCheckBox("启动时自动检查更新（推荐）")
+        self.auto_update_check.setChecked(bool(cfg.get("update", "auto_check", default=True)))
+        update_card.add(self.auto_update_check)
+        source_label = QLabel("更新源：GitHub Releases（内置，无需填写任何地址）")
+        source_label.setObjectName("muted")
+        source_label.setWordWrap(True)
+        update_card.add(source_label)
         layout.addWidget(update_card)
 
         save_row = QHBoxLayout()
@@ -1126,10 +1128,7 @@ class SettingsPage(QWidget):
             self.api_key.setFocus()
 
     def _check_update(self) -> None:
-        source = self.update_url_edit.text().strip()
-        if not source:
-            self.update_status.setText("请先填写更新地址（可留空关闭更新检查）")
-            return
+        source = resolve_manifest_url(self.ctx.cfg)
         self.update_status.setText("正在检查更新…")
         self.check_update_btn.setEnabled(False)
         task = Task(lambda: fetch_manifest(source), self)
@@ -1229,7 +1228,6 @@ class SettingsPage(QWidget):
                     "port": int(self.api_port_spin.value()),
                 },
                 "update": {
-                    "manifest_url": self.update_url_edit.text().strip(),
                     "auto_check": self.auto_update_check.isChecked(),
                 },
             }

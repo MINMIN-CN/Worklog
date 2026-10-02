@@ -120,6 +120,7 @@ REPORTS_DIR = DATA_DIR / "reports"
 TMP_DIR = DATA_DIR / "tmp"
 
 DEFAULT_CONFIG: dict = {
+    "config_version": 2,
     "api": {
         "provider": "deepseek",
         "base_url": "https://api.deepseek.com",
@@ -164,7 +165,7 @@ DEFAULT_CONFIG: dict = {
     },
     "update": {
         "manifest_url": "",
-        "auto_check": False,
+        "auto_check": True,
     },
 }
 
@@ -191,15 +192,32 @@ class Config:
     def load(self) -> None:
         with self._lock:
             existed = self.path.exists()
-            data: dict = {}
+            raw: dict = {}
             if existed:
                 try:
-                    data = json.loads(self.path.read_text(encoding="utf-8"))
+                    raw = json.loads(self.path.read_text(encoding="utf-8"))
                 except Exception:
-                    data = {}
-            self._data = _deep_merge(DEFAULT_CONFIG, data)
-            if not existed:
-                # 首次启动写出默认配置，方便用户查看和直接编辑
+                    raw = {}
+            if not isinstance(raw, dict):
+                raw = {}
+            data = _deep_merge(DEFAULT_CONFIG, raw)
+
+            changed = False
+            # v1 -> v2：旧版本默认关闭自动更新且需要手填更新地址；
+            # 升级后启用内置更新源，除非用户自己配置过地址。
+            try:
+                version = int(raw.get("config_version", 1) or 1)
+            except Exception:
+                version = 1
+            if version < 2:
+                if not (raw.get("update", {}) or {}).get("manifest_url"):
+                    data.setdefault("update", {})["auto_check"] = True
+                data["config_version"] = 2
+                changed = True
+
+            self._data = data
+            if not existed or changed:
+                # 首次启动或配置迁移后写出配置，方便用户查看和直接编辑
                 self.save()
 
     def save(self) -> None:

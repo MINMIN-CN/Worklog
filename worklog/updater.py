@@ -22,6 +22,25 @@ import httpx
 
 from . import __version__
 
+# 内置更新源：GitHub Releases 的 manifest.json 资源，始终指向最新版本
+DEFAULT_MANIFEST_URL = (
+    "https://github.com/MINMIN-CN/Worklog/releases/latest/download/manifest.json"
+)
+
+
+def resolve_manifest_url(cfg=None, override: str = "") -> str:
+    """更新地址的取值顺序：显式指定 > 配置 > 内置默认地址。
+
+    普通用户无需配置；高级用户可在 config.json 的 update.manifest_url 中自定义。
+    """
+    if (override or "").strip():
+        return override.strip()
+    if cfg is not None:
+        configured = (cfg.get("update", "manifest_url", default="") or "").strip()
+        if configured:
+            return configured
+    return DEFAULT_MANIFEST_URL
+
 
 def current_version() -> str:
     return __version__

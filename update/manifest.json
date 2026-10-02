@@ -1,0 +1,5 @@
+{
+  "version": "0.4.0",
+  "url": "https://github.com/MINMIN-CN/Worklog/releases/download/v0.4.0/WorkLog-Setup-0.4.0.exe",
+  "notes": "新增内置自动更新：默认从 GitHub Releases 检查更新，无需配置任何更新地址；设置页可一键检查、下载、静默安装并自动重启。"
+}

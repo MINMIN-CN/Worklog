@@ -204,7 +204,13 @@ def test_migration() -> None:
 def test_updater() -> None:
     import tempfile
 
-    from worklog.updater import fetch_manifest, is_newer, parse_version
+    from worklog.updater import (
+        DEFAULT_MANIFEST_URL,
+        fetch_manifest,
+        is_newer,
+        parse_version,
+        resolve_manifest_url,
+    )
 
     assert parse_version("v0.3.0") == (0, 3, 0)
     assert parse_version("0.3") == (0, 3)
@@ -213,6 +219,21 @@ def test_updater() -> None:
     assert not is_newer("0.2.1", "0.2.1")
     assert not is_newer("0.2.0", "0.2.1")
 
+    # 内置更新源：无需用户配置
+    assert DEFAULT_MANIFEST_URL.startswith("https://github.com/")
+    assert resolve_manifest_url(cfg) == DEFAULT_MANIFEST_URL
+    assert (
+        resolve_manifest_url(cfg, "https://example.com/a.json")
+        == "https://example.com/a.json"
+    )
+    cfg.update({"update": {"manifest_url": "https://example.com/custom.json"}})
+    try:
+        assert resolve_manifest_url(cfg) == "https://example.com/custom.json"
+    finally:
+        cfg.update({"update": {"manifest_url": ""}})
+    assert resolve_manifest_url(cfg) == DEFAULT_MANIFEST_URL
+
+    # 本地清单元数据
     manifest_path = Path(tempfile.mkdtemp(prefix="worklog_manifest_")) / "manifest.json"
     manifest_path.write_text(
         json.dumps(
@@ -222,6 +243,45 @@ def test_updater() -> None:
     )
     manifest = fetch_manifest(str(manifest_path))
     assert manifest["version"] == "9.9.9"
+
+
+def test_config_migration() -> None:
+    """0.3.0 的配置（auto_check=false、无 config_version）应迁移为启用内置更新。"""
+    import tempfile
+
+    path = Path(tempfile.mkdtemp(prefix="worklog_cfg_")) / "config.json"
+    path.write_text(
+        json.dumps({"update": {"manifest_url": "", "auto_check": False}}),
+        encoding="utf-8",
+    )
+    migrated = Config(path)
+    assert migrated.get("update", "auto_check", default=False) is True
+    assert migrated.get("config_version", default=0) == 2
+    # 用户手动关闭后保持不变
+    migrated.update({"update": {"auto_check": False}})
+    reloaded = Config(path)
+    assert reloaded.get("update", "auto_check", default=True) is False
+    # 用户自定义地址时不覆盖 auto_check
+    path2 = Path(tempfile.mkdtemp(prefix="worklog_cfg2_")) / "config.json"
+    path2.write_text(
+        json.dumps(
+            {"update": {"manifest_url": "https://example.com/m.json", "auto_check": False}}
+        ),
+        encoding="utf-8",
+    )
+    custom = Config(path2)
+    assert custom.get("update", "auto_check", default=True) is False
+    assert custom.get("update", "manifest_url", default="") == "https://example.com/m.json"
+
+
+def test_repo_manifest() -> None:
+    """仓库里的 update/manifest.json 必须是合法清单且地址可用。"""
+    manifest_path = Path(__file__).resolve().parent.parent / "update" / "manifest.json"
+    assert manifest_path.exists(), "缺少 update/manifest.json"
+    data = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert data.get("version")
+    assert str(data.get("url", "")).startswith("https://github.com/")
+    assert data["url"].endswith(".exe")
 
 
 def test_capture() -> None:
@@ -359,6 +419,8 @@ check("reports crud", test_reports)
 check("provider presets", test_providers)
 check("legacy data migration", test_migration)
 check("updater", test_updater)
+check("config migration", test_config_migration)
+check("repo manifest", test_repo_manifest)
 check("screen capture", test_capture)
 check("engine store merge", test_engine_store)
 check("agent api start", test_api_start)

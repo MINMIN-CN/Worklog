@@ -2,7 +2,7 @@
 ; 构建：packaging\build.bat（或 ISCC.exe /DUseChinese=1 packaging\installer.iss）
 
 #define MyAppName "工作小记"
-#define MyAppVersion "0.3.0"
+#define MyAppVersion "0.4.0"
 #define MyAppExeName "WorkLog.exe"
 #define MyAppId "{{B7E4A2F1-3C6D-4E8B-9A5F-1D2C3B4A5E6F}"
 #define MyAppIdPlain "{B7E4A2F1-3C6D-4E8B-9A5F-1D2C3B4A5E6F}"
