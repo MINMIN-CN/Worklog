@@ -1,5 +1,5 @@
 {
-  "version": "0.4.2",
-  "url": "https://github.com/MINMIN-CN/Worklog/releases/download/v0.4.2/WorkLog-Setup-0.4.2.exe",
-  "notes": "修复应用内升级在中文/非 ASCII 安装路径下“重启应用失败”的问题：更新脚本改为 PowerShell（UTF-8 BOM），并修复静默启动方式。安装本身一直正常，数据不受影响。"
+  "version": "0.5.0",
+  "url": "https://github.com/MINMIN-CN/Worklog/releases/download/v0.5.0/WorkLog-Setup-0.5.0.exe",
+  "notes": "新增界面语言支持：简体中文 / English，默认跟随系统语言，可在设置中切换；AI 提示词与报告模板提供英文版本，英文界面下生成英文日报；安装程序支持中英双语。"
 }

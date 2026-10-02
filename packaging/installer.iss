@@ -2,7 +2,7 @@
 ; 构建：packaging\build.bat（或 ISCC.exe /DUseChinese=1 packaging\installer.iss）
 
 #define MyAppName "工作小记"
-#define MyAppVersion "0.4.2"
+#define MyAppVersion "0.5.0"
 #define MyAppExeName "WorkLog.exe"
 #define MyAppId "{{B7E4A2F1-3C6D-4E8B-9A5F-1D2C3B4A5E6F}"
 #define MyAppIdPlain "{B7E4A2F1-3C6D-4E8B-9A5F-1D2C3B4A5E6F}"
@@ -28,7 +28,7 @@ SetupIconFile=worklog.ico
 UninstallDisplayIcon={app}\{#MyAppExeName}
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
-ShowLanguageDialog=no
+ShowLanguageDialog=auto
 ; ---- 升级安装 ----
 DisableDirPage=auto
 UsePreviousAppDir=yes
@@ -37,13 +37,38 @@ RestartApplications=no
 SetupMutex=WorkLogSetupMutex,Global\WorkLogSetupMutex
 
 [Languages]
+Name: "english"; MessagesFile: "compiler:Default.isl"
 #ifdef UseChinese
 Name: "chinesesimplified"; MessagesFile: "ChineseSimplified.isl"
 #endif
 
+[CustomMessages]
+english.DesktopIcon=Create a desktop shortcut
+chinesesimplified.DesktopIcon=创建桌面快捷方式
+english.Autostart=Start automatically on sign-in (recommended for continuous logging)
+chinesesimplified.Autostart=开机自动启动（推荐，持续记录工作轨迹）
+english.AdditionalTasks=Additional tasks:
+chinesesimplified.AdditionalTasks=附加任务：
+english.RunApp=Launch {#MyAppName}
+chinesesimplified.RunApp=立即启动 {#MyAppName}
+english.UpgradeWelcome=The installer detected version %1 of 工作小记 (WorkLog) and will upgrade it to v%2. All work data, reports and settings will be kept — no need to uninstall first. Click Next to continue.
+chinesesimplified.UpgradeWelcome=安装程序检测到已安装的 工作小记 v%1，将自动升级到 v%2。原有的工作数据、报告和设置会完整保留，无需先卸载旧版本。点击「下一步」继续。
+english.DeleteDataQuestion=Delete work data?
+chinesesimplified.DeleteDataQuestion=是否删除工作数据？
+english.DeleteDataText=Work data includes records, reports, to-dos and AI settings. Choosing "Keep data" moves it to:
+chinesesimplified.DeleteDataText=工作数据包含：工作记录、报告、待办和 AI 配置。选择「保留数据」会把数据移动到：
+english.DeleteDataHint=Reinstalling later will migrate it back automatically.
+chinesesimplified.DeleteDataHint=以后重新安装会自动迁移回来。
+english.DeleteData=Delete data
+chinesesimplified.DeleteData=删除数据
+english.KeepData=Keep data
+chinesesimplified.KeepData=保留数据
+english.MoveFailed=Could not move the data; it is still kept in the program folder: %1
+chinesesimplified.MoveFailed=数据移动失败，数据仍保留在程序目录：%1
+
 [Tasks]
-Name: "desktopicon"; Description: "创建桌面快捷方式"; GroupDescription: "附加任务："; Flags: checkedonce
-Name: "autostart"; Description: "开机自动启动（推荐，持续记录工作轨迹）"; GroupDescription: "附加任务："
+Name: "desktopicon"; Description: "{cm:DesktopIcon}"; GroupDescription: "{cm:AdditionalTasks}"; Flags: checkedonce
+Name: "autostart"; Description: "{cm:Autostart}"; GroupDescription: "{cm:AdditionalTasks}"
 
 [Files]
 Source: "..\dist\WorkLog\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -54,7 +79,7 @@ Name: "{userdesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: de
 Name: "{userstartup}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: autostart
 
 [Run]
-Filename: "{app}\{#MyAppExeName}"; Description: "立即启动 {#MyAppName}"; Flags: nowait postinstall skipifsilent; Check: ShouldShowRunEntry
+Filename: "{app}\{#MyAppExeName}"; Description: "{cm:RunApp}"; Flags: nowait postinstall skipifsilent; Check: ShouldShowRunEntry
 
 [Code]
 var
@@ -101,10 +126,7 @@ procedure InitializeWizard();
 begin
   if PreviousVersion <> '' then
     WizardForm.WelcomeLabel2.Caption :=
-      '安装程序检测到已安装的 工作小记 v' + PreviousVersion +
-      '，将自动升级到 v{#MyAppVersion}。' + #13#10 + #13#10 +
-      '原有的工作数据、报告和设置会完整保留，无需先卸载旧版本。' + #13#10 + #13#10 +
-      '点击「下一步」继续。';
+      FmtMessage(ExpandConstant('{cm:UpgradeWelcome}'), [PreviousVersion, '{#MyAppVersion}']);
 end;
 
 (* 升级前让正在运行的应用自行退出，避免文件被占用。
@@ -215,16 +237,15 @@ begin
       else
       begin
         case TaskDialogMsgBox(
-          '是否删除工作数据？',
-          '工作数据包含：工作记录、报告、待办和 AI 配置。' + #13#10 + #13#10 +
-          '选择「保留数据」会把数据移动到：' + #13#10 + KeepDir + #13#10 +
-          '以后重新安装会自动迁移回来。',
-          mbConfirmation, MB_YESNO, ['删除数据', '保留数据'], 1) of
+          ExpandConstant('{cm:DeleteDataQuestion}'),
+          ExpandConstant('{cm:DeleteDataText}') + #13#10 + KeepDir + #13#10 +
+          ExpandConstant('{cm:DeleteDataHint}'),
+          mbConfirmation, MB_YESNO, [ExpandConstant('{cm:DeleteData}'), ExpandConstant('{cm:KeepData}')], 1) of
           IDYES:
             DelTree(DataDir, True, True, True);
           IDNO:
             if not MoveDirRecursive(DataDir, KeepDir) then
-              MsgBox('数据移动失败，数据仍保留在程序目录：' + #13#10 + DataDir,
+              MsgBox(FmtMessage(ExpandConstant('{cm:MoveFailed}'), [DataDir]),
                      mbInformation, MB_OK);
         end;
       end;

@@ -14,6 +14,7 @@ from datetime import datetime, timedelta
 
 from PySide6.QtCore import QObject, Signal
 
+from . import i18n
 from .ai import AIError, has_api_key, make_client
 from .analyze import analyze_capture, classify_text
 from .capture import Capture, average_hash, encode_jpeg, grab_screen, hamming
@@ -277,8 +278,8 @@ class RecorderEngine(QObject):
         }
 
         if not has_api_key(self.cfg):
-            record["summary"] = capture.title or capture.app or "屏幕活动"
-            record["details"] = "未配置 AI 模型，可在设置中配置后重新分析。"
+            record["summary"] = capture.title or capture.app or i18n.tr("屏幕活动")
+            record["details"] = i18n.tr("未配置 AI 模型，可在设置中配置后重新分析。")
             self._store(record)
             return
 
@@ -307,8 +308,10 @@ class RecorderEngine(QObject):
             "app": capture.app,
             "title": capture.title,
             "category": "未分类",
-            "summary": capture.title or capture.app or "屏幕活动",
-            "details": f"AI 分析失败：{error}" if error else "",
+            "summary": capture.title or capture.app or i18n.tr("屏幕活动"),
+            "details": i18n.tr("AI 分析失败：{message}").format(message=error)
+            if error
+            else "",
             "project": "",
             "tags": [],
             "hits": 1,

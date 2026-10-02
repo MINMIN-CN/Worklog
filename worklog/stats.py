@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 
+from . import i18n
+
 MAX_RECORD_SECONDS = 2 * 60 * 60  # 单条记录最长按 2 小时计
 
 
@@ -22,14 +24,14 @@ def record_duration(record: dict) -> float:
 def format_duration(seconds: float) -> str:
     seconds = int(seconds or 0)
     if seconds <= 0:
-        return "0 分钟"
+        return i18n.tr("{minutes} 分钟").format(minutes=0)
     hours, remainder = divmod(seconds, 3600)
     minutes = remainder // 60
     if hours and minutes:
-        return f"{hours} 小时 {minutes} 分"
+        return i18n.tr("{hours} 小时 {minutes} 分").format(hours=hours, minutes=minutes)
     if hours:
-        return f"{hours} 小时"
-    return f"{max(1, minutes)} 分钟"
+        return i18n.tr("{hours} 小时").format(hours=hours)
+    return i18n.tr("{minutes} 分钟").format(minutes=max(1, minutes))
 
 
 def format_span(hours: float, minutes: int = 0) -> str:

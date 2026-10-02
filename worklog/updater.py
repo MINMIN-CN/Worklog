@@ -20,7 +20,7 @@ from pathlib import Path
 
 import httpx
 
-from . import __version__
+from . import __version__, i18n
 from .net import default_verify
 
 # 内置更新源：GitHub Releases 的 manifest.json 资源，始终指向最新版本
@@ -63,7 +63,7 @@ def fetch_manifest(source: str) -> dict:
     """读取更新清单，支持 http(s) 链接和本地文件路径。"""
     source = (source or "").strip()
     if not source:
-        raise ValueError("未配置更新地址")
+        raise ValueError(i18n.tr("未配置更新地址"))
     if source.startswith(("http://", "https://")):
         response = httpx.get(
             source,
@@ -76,7 +76,7 @@ def fetch_manifest(source: str) -> dict:
     else:
         data = json.loads(Path(source).expanduser().read_text(encoding="utf-8"))
     if not isinstance(data, dict) or not data.get("version"):
-        raise ValueError("更新清单格式不正确，需要包含 version 和 url 字段")
+        raise ValueError(i18n.tr("更新清单格式不正确，需要包含 version 和 url 字段"))
     return data
 
 
@@ -88,7 +88,7 @@ def download_installer(
     """下载安装包到临时目录，返回文件路径。"""
     url = (url or "").strip()
     if not url:
-        raise ValueError("更新清单里缺少下载地址 url")
+        raise ValueError(i18n.tr("更新清单里缺少下载地址 url"))
     target_dir = Path(dest_dir or (Path(tempfile.gettempdir()) / "worklog_update"))
     target_dir.mkdir(parents=True, exist_ok=True)
     name = os.path.basename(url.split("?", 1)[0]) or "WorkLog-Setup.exe"
@@ -124,7 +124,9 @@ def launch_update(installer: str | Path, restart: bool = True) -> Path:
     """
     installer = Path(installer)
     if not installer.exists():
-        raise FileNotFoundError(f"安装包不存在：{installer}")
+        raise FileNotFoundError(
+            i18n.tr("安装包不存在：{path}").format(path=installer)
+        )
 
     pid = os.getpid()
     script = Path(tempfile.gettempdir()) / "worklog_update.ps1"

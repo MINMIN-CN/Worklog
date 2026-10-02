@@ -61,6 +61,7 @@ CREATE TABLE IF NOT EXISTS templates (
     kind TEXT DEFAULT 'daily',
     instruction TEXT DEFAULT '',
     builtin INTEGER DEFAULT 0,
+    lang TEXT DEFAULT 'zh',
     created_at TEXT DEFAULT ''
 );
 """
@@ -99,6 +100,13 @@ class Database:
             self._conn.execute("PRAGMA synchronous=NORMAL")
             self._conn.executescript(SCHEMA)
             self._conn.commit()
+            # 旧库升级：templates 增加 lang 列（中文/英文模板共存）
+            columns = [row["name"] for row in self._query("PRAGMA table_info(templates)")]
+            if "lang" not in columns:
+                self._conn.execute(
+                    "ALTER TABLE templates ADD COLUMN lang TEXT DEFAULT 'zh'"
+                )
+                self._conn.commit()
 
     # ------------------------------------------------------------------ 基础
     def _execute(self, sql: str, params: tuple = ()) -> sqlite3.Cursor:
@@ -260,14 +268,26 @@ class Database:
         return int(rows[0]["n"]) if rows else 0
 
     # -------------------------------------------------------------- templates
-    def templates(self) -> list[dict]:
+    def templates(self, lang: str | None = None) -> list[dict]:
+        if lang:
+            return self._query(
+                "SELECT * FROM templates WHERE lang=? ORDER BY builtin DESC, id ASC",
+                (lang,),
+            )
         return self._query("SELECT * FROM templates ORDER BY builtin DESC, id ASC")
 
-    def add_template(self, name: str, kind: str, instruction: str, builtin: int = 0) -> int:
+    def add_template(
+        self,
+        name: str,
+        kind: str,
+        instruction: str,
+        builtin: int = 0,
+        lang: str = "zh",
+    ) -> int:
         cur = self._execute(
-            "INSERT OR IGNORE INTO templates (name, kind, instruction, builtin, created_at)"
-            " VALUES (?,?,?,?,?)",
-            (name, kind, instruction, builtin, _now()),
+            "INSERT OR IGNORE INTO templates (name, kind, instruction, builtin, lang, created_at)"
+            " VALUES (?,?,?,?,?,?)",
+            (name, kind, instruction, builtin, lang, _now()),
         )
         return int(cur.lastrowid or 0)
 
@@ -281,12 +301,14 @@ class Database:
         self._execute("DELETE FROM templates WHERE id=?", (template_id,))
 
     def seed_templates(self, items: list[dict]) -> None:
-        rows = self._query("SELECT COUNT(*) AS n FROM templates")
-        if rows and int(rows[0]["n"]) > 0:
-            return
+        """按名字补齐缺失的内置模板（支持中英两套并存）。"""
         for item in items:
             self.add_template(
-                item["name"], item["kind"], item["instruction"], builtin=1
+                item["name"],
+                item["kind"],
+                item["instruction"],
+                builtin=1,
+                lang=item.get("lang", "zh"),
             )
 
     def close(self) -> None:

@@ -1,6 +1,6 @@
 @echo off
 rem 一键构建 Windows 安装包：图标 -> PyInstaller -> Inno Setup
-rem 产物：dist\installer\WorkLog-Setup-0.4.2.exe
+rem 产物：dist\installer\WorkLog-Setup-0.5.0.exe
 chcp 65001 >nul
 setlocal
 cd /d "%~dp0.."

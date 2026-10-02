@@ -9,6 +9,7 @@ import time
 
 import httpx
 
+from . import i18n
 from .net import default_verify
 
 
@@ -19,16 +20,18 @@ class AIError(RuntimeError):
 def _friendly_http_error(status: int, body: str) -> str:
     snippet = (body or "").strip().replace("\n", " ")[:200]
     if status == 401:
-        return "API Key 无效或未授权（HTTP 401）"
+        return i18n.tr("API Key 无效或未授权（HTTP 401）")
     if status == 403:
-        return "无权访问该模型（HTTP 403）"
+        return i18n.tr("无权访问该模型（HTTP 403）")
     if status == 404:
-        return "接口地址或模型名不存在（HTTP 404）"
+        return i18n.tr("接口地址或模型名不存在（HTTP 404）")
     if status == 429:
-        return "请求过于频繁或额度不足（HTTP 429）"
+        return i18n.tr("请求过于频繁或额度不足（HTTP 429）")
     if status >= 500:
-        return f"模型服务异常（HTTP {status}）"
-    return f"接口返回错误（HTTP {status}）：{snippet}"
+        return i18n.tr("模型服务异常（HTTP {status}）").format(status=status)
+    return i18n.tr("接口返回错误（HTTP {status}）：{snippet}").format(
+        status=status, snippet=snippet
+    )
 
 
 class AIClient:
@@ -67,9 +70,9 @@ class AIClient:
         json_mode: bool | None = None,
     ) -> str:
         if not self.base_url:
-            raise AIError("未配置 API 地址")
+            raise AIError(i18n.tr("未配置 API 地址"))
         if not self.api_key:
-            raise AIError("未配置 API Key")
+            raise AIError(i18n.tr("未配置 API Key"))
 
         payload: dict = {
             "model": model,
@@ -87,7 +90,9 @@ class AIClient:
             try:
                 response = self._client.post(url, json=payload)
             except httpx.TransportError as exc:
-                last_error = AIError(f"无法连接模型接口：{exc}")
+                last_error = AIError(
+                    i18n.tr("无法连接模型接口：{message}").format(message=exc)
+                )
                 if attempt == 0:
                     time.sleep(2)
                     continue
@@ -105,7 +110,9 @@ class AIClient:
                 data = response.json()
                 content = data["choices"][0]["message"]["content"]
             except Exception as exc:
-                raise AIError(f"响应格式异常：{str(exc)[:120]}") from exc
+                raise AIError(
+                    i18n.tr("响应格式异常：{message}").format(message=str(exc)[:120])
+                ) from exc
 
             if isinstance(content, list):
                 parts: list[str] = []
@@ -117,7 +124,7 @@ class AIClient:
                 content = "".join(parts)
             return content or ""
 
-        raise last_error or AIError("请求失败")
+        raise last_error or AIError(i18n.tr("请求失败"))
 
 
 _client_cache: dict[tuple, AIClient] = {}

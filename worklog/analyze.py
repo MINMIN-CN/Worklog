@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from datetime import datetime
 
+from . import i18n, prompts_en
 from .ai import AIClient, AIError, parse_json_list_loose, parse_json_loose
 from .capture import Capture, to_data_url
 
@@ -123,21 +124,29 @@ def analyze_capture(
     """调用视觉模型分析截图，返回记录字段（不含时间、ID）。"""
     fallback = {
         "category": "未分类",
-        "summary": _clean_text(capture.title, 30, capture.app or "屏幕活动"),
+        "summary": _clean_text(capture.title, 30, capture.app or i18n.tr("屏幕活动")),
         "details": "",
         "project": "",
         "tags": [],
         "sensitive": False,
     }
     extra = (cfg.get("api", "extra_instruction", default="") or "").strip()
-    user_text = VISION_USER_PROMPT.format(
+    if i18n.is_english():
+        system_prompt = prompts_en.VISION_SYSTEM_PROMPT
+        user_template = prompts_en.VISION_USER_PROMPT
+        extra_text = f"\nAdditional instructions: {extra}" if extra else ""
+    else:
+        system_prompt = VISION_SYSTEM_PROMPT
+        user_template = VISION_USER_PROMPT
+        extra_text = f"\n补充要求：{extra}" if extra else ""
+    user_text = user_template.format(
         ts=capture.ts.strftime("%Y-%m-%d %H:%M:%S"),
         app=capture.app or "未知",
         title=capture.title or "(无标题)",
-        extra=f"\n补充要求：{extra}" if extra else "",
+        extra=extra_text,
     )
     messages = [
-        {"role": "system", "content": VISION_SYSTEM_PROMPT},
+        {"role": "system", "content": system_prompt},
         {
             "role": "user",
             "content": [
@@ -174,15 +183,22 @@ def classify_text(
         "tags": [],
         "sensitive": False,
     }
-    user_text = TEXT_USER_PROMPT.format(
+    user_text = (prompts_en.TEXT_USER_PROMPT if i18n.is_english() else TEXT_USER_PROMPT).format(
         ts=ts,
         app=app or "未知",
         title=title or "(无标题)",
         categories="、".join(CATEGORIES),
     )
     raw = client.chat(
-        [{"role": "system", "content": TEXT_SYSTEM_PROMPT},
-         {"role": "user", "content": user_text}],
+        [
+            {
+                "role": "system",
+                "content": prompts_en.TEXT_SYSTEM_PROMPT
+                if i18n.is_english()
+                else TEXT_SYSTEM_PROMPT,
+            },
+            {"role": "user", "content": user_text},
+        ],
         model=model or cfg.get("api", "text_model", default="gpt-4o-mini"),
         max_tokens=500,
     )
@@ -197,9 +213,17 @@ def extract_todos(
     model: str | None = None,
 ) -> list[dict]:
     """从时间线中提取待办。"""
+    if i18n.is_english():
+        system_prompt = prompts_en.TODO_SYSTEM_PROMPT
+        user_template = prompts_en.TODO_USER_PROMPT
+    else:
+        system_prompt = TODO_SYSTEM_PROMPT
+        user_template = TODO_USER_PROMPT
     raw = client.chat(
-        [{"role": "system", "content": TODO_SYSTEM_PROMPT},
-         {"role": "user", "content": TODO_USER_PROMPT.format(timeline=timeline_text)}],
+        [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_template.format(timeline=timeline_text)},
+        ],
         model=model or cfg.get("api", "text_model", default="gpt-4o-mini"),
         max_tokens=900,
     )

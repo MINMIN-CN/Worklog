@@ -274,6 +274,71 @@ def test_config_migration() -> None:
     assert custom.get("update", "manifest_url", default="") == "https://example.com/m.json"
 
 
+def test_i18n() -> None:
+    from worklog import i18n
+
+    i18n.set_language("zh")
+    assert i18n.tr("今日概览") == "今日概览"
+    assert i18n.category_display("开发") == "开发"
+    assert i18n.detect_system_language() in ("zh", "en")
+    assert i18n.resolve_language("en") == "en"
+    assert i18n.resolve_language("zh") == "zh"
+
+    i18n.set_language("en")
+    assert i18n.tr("今日概览") == "Today"
+    assert i18n.tr("这句没有英文") == "这句没有英文"
+    assert i18n.category_display("开发") == "Development"
+    assert i18n.category_display("未分类") == "Uncategorized"
+    assert i18n.category_key("Development") == "开发"
+
+    # 动态文案的 key 必须齐全（程序里会做 .format）
+    dynamic_keys = [
+        "{date} · {n} 个片段",
+        "共采集 {n} 次",
+        "· {n} 个片段",
+        "确定删除 {time} 的这条记录吗？",
+        "完成：{done}/{total} 条记录已补上分析。",
+        "· {open} 项未完成 / 共 {total} 项",
+        "截止 {date}",
+        "删除「{title}」？",
+        "{day} 没有工作记录。",
+        "提取到 {n} 条待办",
+        "检查失败：{message}",
+        "已是最新版本（v{version}）",
+        "发现新版本 v{remote}（当前 v{current}）",
+        "发现新版本 v{remote}，可稍后再更新",
+        "下载完成：{path}",
+        "文本模型失败（{message}）",
+        "视觉模型失败（{message}）",
+        "{result}。确认无误后点「保存设置」",
+        "失败：{message}",
+        "{label} 没有任何工作记录。",
+        "当前版本：v{version}",
+        "当前数据目录：{path}",
+        "显示器 {n}",
+        " 秒",
+        "{minutes} 分钟",
+        "{hours} 小时 {minutes} 分",
+        "{hours} 小时",
+        "AI 分析失败：{message}",
+        "下载失败：{message}",
+        "更新启动失败：{message}",
+        "无法连接模型接口：{message}",
+        "响应格式异常：{message}",
+        "模型服务异常（HTTP {status}）",
+        "接口返回错误（HTTP {status}）：{snippet}",
+        "安装包不存在：{path}",
+    ]
+    missing = [key for key in dynamic_keys if key not in i18n.EN]
+    assert not missing, f"缺少英文条目：{missing}"
+
+    # FAQ: 界面常见固定文案
+    for key in ["今日概览", "时间线", "统计", "报告", "待办", "设置", "记录中", "已暂停"]:
+        assert key in i18n.EN, key
+
+    i18n.set_language("zh")
+
+
 def test_net_verify() -> None:
     import ssl
 
@@ -397,21 +462,26 @@ ctx = AppContext(cfg=cfg, db=db, engine=engine, api=None)
 
 
 def test_window() -> None:
-    window = MainWindow(ctx)
-    try:
-        assert window.stack.count() == 6
-        for index in range(6):
-            window.nav.setCurrentRow(index)
-            page = window.stack.currentWidget()
-            if hasattr(page, "refresh"):
-                page.refresh()
-        window.stats_page.refresh()
-        window.today_page.refresh()
-    finally:
-        window._really_quit = True
-        window.tray.hide()
-        window.close()
-        window.deleteLater()
+    from worklog import i18n
+
+    for language in ("zh", "en"):
+        i18n.set_language(language)
+        window = MainWindow(ctx)
+        try:
+            assert window.stack.count() == 6
+            for index in range(6):
+                window.nav.setCurrentRow(index)
+                page = window.stack.currentWidget()
+                if hasattr(page, "refresh"):
+                    page.refresh()
+            window.stats_page.refresh()
+            window.today_page.refresh()
+        finally:
+            window._really_quit = True
+            window.tray.hide()
+            window.close()
+            window.deleteLater()
+    i18n.set_language("zh")
 
 
 # -------------------------------------------------------------------- 执行
@@ -429,6 +499,7 @@ check("provider presets", test_providers)
 check("legacy data migration", test_migration)
 check("updater", test_updater)
 check("config migration", test_config_migration)
+check("i18n", test_i18n)
 check("net verify", test_net_verify)
 check("repo manifest", test_repo_manifest)
 check("screen capture", test_capture)

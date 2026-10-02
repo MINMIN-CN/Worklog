@@ -6,13 +6,13 @@ import sys
 
 from PySide6.QtWidgets import QApplication
 
-from . import APP_NAME
+from . import APP_NAME, i18n
 from .agent_api import AgentAPI
 from .config import DB_PATH, Config, ensure_dirs
 from .context import AppContext
 from .db import Database
 from .recorder import RecorderEngine
-from .reporting import DEFAULT_TEMPLATES
+from .reporting import all_default_templates
 from .ui.main_window import MainWindow
 from .ui.theme import QSS
 from .ui.widgets import make_icon
@@ -46,8 +46,8 @@ def _single_instance_guard(wait_seconds: float = 0.0) -> bool:
                 if time.monotonic() >= deadline:
                     user32.MessageBoxW(
                         None,
-                        "工作小记已经在运行，请在系统托盘查看。",
-                        "工作小记",
+                        i18n.tr("工作小记已经在运行，请在系统托盘查看。"),
+                        i18n.tr("工作小记"),
                         0x40,  # MB_ICONINFORMATION
                     )
                     return False
@@ -69,6 +69,8 @@ def _single_instance_guard(wait_seconds: float = 0.0) -> bool:
 
 
 def main() -> int:
+    # 单实例提示出现在读取配置之前，先按系统语言初始化
+    i18n.set_language(i18n.detect_system_language())
     wait_instance = "--wait-instance" in sys.argv
     if wait_instance:
         sys.argv = [argument for argument in sys.argv if argument != "--wait-instance"]
@@ -78,8 +80,9 @@ def main() -> int:
     ensure_dirs()
 
     cfg = Config()
+    i18n.set_language(i18n.resolve_language(cfg.get("ui", "language", default="auto")))
     db = Database(DB_PATH)
-    db.seed_templates(DEFAULT_TEMPLATES)
+    db.seed_templates(all_default_templates())
 
     app = QApplication(sys.argv)
     app.setApplicationName(APP_NAME)

@@ -18,7 +18,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .. import APP_NAME, __version__
+from .. import APP_NAME, __version__, i18n
 from ..config import DATA_DIR
 from ..updater import (
     download_installer,
@@ -53,7 +53,7 @@ class MainWindow(QMainWindow):
         self._really_quit = False
         self._tray_notified = False
 
-        self.setWindowTitle(f"{APP_NAME} · 工作记录与日报助手")
+        self.setWindowTitle(i18n.tr("工作小记 · 工作记录与日报助手"))
         self.resize(1240, 820)
         self.setWindowIcon(make_icon())
 
@@ -67,7 +67,7 @@ class MainWindow(QMainWindow):
         self.nav.setObjectName("nav")
         self.nav.setFixedWidth(150)
         for name in ["今日", "时间线", "统计", "报告", "待办", "设置"]:
-            self.nav.addItem(name)
+            self.nav.addItem(i18n.tr(name))
         root_layout.addWidget(self.nav)
 
         right = QVBoxLayout()
@@ -152,6 +152,7 @@ class MainWindow(QMainWindow):
             self._on_status("stopped")
 
         QTimer.singleShot(4000, self._auto_check_update)
+        i18n.translate_widget_tree(self)
 
     # ------------------------------------------------------------------ 更新
     def _check_installer_close(self) -> None:
@@ -190,20 +191,26 @@ class MainWindow(QMainWindow):
         if not is_newer(remote):
             return
         notes = str(manifest.get("notes") or "").strip()
-        message = f"发现新版本 v{remote}（当前 v{__version__}）"
+        message = i18n.tr("发现新版本 v{remote}（当前 v{current}）").format(
+            remote=remote, current=__version__
+        )
         if notes:
             message += f"\n\n{notes}"
-        message += "\n\n是否立即下载并自动安装？安装完成后程序会自动重新打开。"
-        if QMessageBox.question(self, "检查更新", message) != QMessageBox.Yes:
+        message += "\n\n" + i18n.tr("是否立即下载并自动安装？安装完成后程序会自动重新打开。")
+        if QMessageBox.question(self, i18n.tr("检查更新"), message) != QMessageBox.Yes:
             return
         url = str(manifest.get("url") or "")
         if not url:
-            self._show_message("更新清单缺少下载地址 url")
+            self._show_message(i18n.tr("更新清单缺少下载地址 url"))
             return
-        self._show_message("正在下载新版本…")
+        self._show_message(i18n.tr("正在下载新版本…"))
         task = Task(lambda: download_installer(url), self)
         task.done.connect(self._install_downloaded)
-        task.fail.connect(lambda message: self._show_message(f"下载失败：{message}"))
+        task.fail.connect(
+            lambda message: self._show_message(
+                i18n.tr("下载失败：{message}").format(message=message)
+            )
+        )
         self._update_task = task
         task.start()
 
@@ -211,7 +218,7 @@ class MainWindow(QMainWindow):
         try:
             launch_update(path)
         except Exception as exc:
-            self._show_message(f"更新启动失败：{exc}")
+            self._show_message(i18n.tr("更新启动失败：{message}").format(message=exc))
             return
         QApplication.quit()
 
@@ -240,12 +247,13 @@ class MainWindow(QMainWindow):
     def _on_status(self, status: str) -> None:
         base = (status or "stopped").split(":", 1)[0]
         label = STATUS_LABELS.get(base, "异常")
-        self.pill.setText(label)
+        self.pill.setText(i18n.tr(label))
         self.pill.setProperty("state", base if base in STATUS_LABELS else "error")
         refresh_style(self.pill)
         paused = base == "paused"
-        self.pause_btn.setText("继续记录" if paused else "暂停记录")
-        self.tray_pause_action.setText("继续记录" if paused else "暂停记录")
+        pause_text = i18n.tr("继续记录" if paused else "暂停记录")
+        self.pause_btn.setText(pause_text)
+        self.tray_pause_action.setText(pause_text)
 
     def _on_record_changed(self, _payload: dict) -> None:
         page = self.stack.currentWidget()
@@ -259,7 +267,7 @@ class MainWindow(QMainWindow):
     # ------------------------------------------------------------------ 托盘
     def _setup_tray(self) -> None:
         self.tray = QSystemTrayIcon(make_icon(), self)
-        self.tray.setToolTip(f"{APP_NAME} · 工作记录与日报助手")
+        self.tray.setToolTip(i18n.tr("工作小记 · 工作记录与日报助手"))
         menu = QMenu()
         show_action = menu.addAction("显示主窗口")
         show_action.triggered.connect(self._show_window)
@@ -270,6 +278,8 @@ class MainWindow(QMainWindow):
         menu.addSeparator()
         quit_action = menu.addAction("退出")
         quit_action.triggered.connect(self._quit)
+        self.tray_menu = menu
+        i18n.translate_menu(menu)
         self.tray.setContextMenu(menu)
         self.tray.activated.connect(self._on_tray_activated)
         self.tray.show()
@@ -298,8 +308,8 @@ class MainWindow(QMainWindow):
             self.hide()
             if not self._tray_notified:
                 self.tray.showMessage(
-                    APP_NAME,
-                    "已最小化到托盘，记录继续运行。",
+                    i18n.tr("工作小记"),
+                    i18n.tr("已最小化到托盘，记录继续运行。"),
                     QSystemTrayIcon.Information,
                     3000,
                 )

@@ -18,6 +18,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from .. import i18n
+
 WEEKDAYS = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
 
 
@@ -212,7 +214,7 @@ class HeatmapWidget(QWidget):
             painter.drawText(
                 QRectF(0, top + day * cell_h, left - 8, cell_h),
                 Qt.AlignRight | Qt.AlignVCenter,
-                WEEKDAYS[day],
+                i18n.tr(WEEKDAYS[day]),
             )
         painter.end()
 
@@ -223,12 +225,16 @@ class TagCloudWidget(QLabel):
         self._empty_text = empty_text
         self.setWordWrap(True)
         self.setTextFormat(Qt.RichText)
-        self.setText(f"<span style='color:#6f7890'>{empty_text}</span>")
+        self.setText(
+            f"<span style='color:#6f7890'>{i18n.tr(empty_text)}</span>"
+        )
 
     def set_tags(self, items: list) -> None:
         items = list(items)[:24]
         if not items:
-            self.setText(f"<span style='color:#6f7890'>{self._empty_text}</span>")
+            self.setText(
+                f"<span style='color:#6f7890'>{i18n.tr(self._empty_text)}</span>"
+            )
             return
         max_count = max(count for _, count in items) or 1
         min_count = min(count for _, count in items)
@@ -289,7 +295,7 @@ class RecordCard(QFrame):
         )
         time_label.setObjectName("recordTime")
         time_label.setFixedWidth(104)
-        category = QLabel(record.get("category") or "未分类")
+        category = QLabel(i18n.category_display(record.get("category") or "未分类"))
         category.setObjectName("chip")
         app_label = QLabel(
             f"{record.get('app') or '未知'} · {record.get('title') or ''}".rstrip(" ·")
@@ -299,7 +305,7 @@ class RecordCard(QFrame):
         hits_label = QLabel(f"×{hits}" if hits > 1 else "")
         hits_label.setObjectName("cardSub")
         pending = int(record.get("pending") or 0)
-        pending_label = QLabel("待分析" if pending else "")
+        pending_label = QLabel(i18n.tr("待分析") if pending else "")
         pending_label.setObjectName("cardSub")
 
         top.addWidget(time_label)

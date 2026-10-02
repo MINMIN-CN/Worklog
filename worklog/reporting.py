@@ -5,9 +5,21 @@ from __future__ import annotations
 import calendar
 from datetime import date, datetime, timedelta
 
+from . import i18n
 from .ai import AIClient
+from .prompts_en import REPORT_SYSTEM_PROMPT as REPORT_SYSTEM_PROMPT_EN
+from .templates_en import EN_TEMPLATES
 
 KIND_LABELS = {"daily": "日报", "weekly": "周报", "monthly": "月报", "custom": "报告"}
+
+
+def kind_label(kind: str) -> str:
+    return i18n.tr(KIND_LABELS.get(kind, "报告"))
+
+
+def all_default_templates() -> list[dict]:
+    """中英两套内置模板（英文模板带 lang=en）。"""
+    return [*DEFAULT_TEMPLATES, *EN_TEMPLATES]
 
 DEFAULT_TEMPLATES: list[dict] = [
     {
@@ -90,14 +102,16 @@ def build_timeline_text(records: list[dict], max_chars: int = 12000) -> str:
             end = datetime.fromisoformat(record["end_ts"]).strftime("%H:%M")
         except Exception:
             start, end = "", ""
-        head = f"[{start}-{end}] [{record.get('category') or '未分类'}] {record.get('app') or ''}".rstrip()
+        category = i18n.category_display(record.get("category") or "未分类")
+        head = f"[{start}-{end}] [{category}] {record.get('app') or ''}".rstrip()
         if record.get("title"):
             head += f" · {record['title']}"
         line = head + "\n  " + (record.get("summary") or "")
         if record.get("details"):
             line += f"（{str(record['details'])[:120]}）"
         if record.get("project"):
-            line += f" [项目:{record['project']}]"
+            project_prefix = "Project" if i18n.is_english() else "项目"
+            line += f" [{project_prefix}:{record['project']}]"
         lines.append(line)
     text = "\n".join(lines)
     if len(text) > max_chars:
@@ -116,7 +130,11 @@ def range_for(kind: str, ref: date) -> tuple[str, str, str]:
     if kind == "monthly":
         first = ref.replace(day=1)
         last = ref.replace(day=calendar.monthrange(ref.year, ref.month)[1])
-        return first.isoformat(), last.isoformat(), f"{ref.year}年{ref.month}月"
+        if i18n.is_english():
+            label = f"{calendar.month_name[ref.month]} {ref.year}"
+        else:
+            label = f"{ref.year}年{ref.month}月"
+        return first.isoformat(), last.isoformat(), label
     # custom
     return ref.isoformat(), ref.isoformat(), ref.isoformat()
 
@@ -143,10 +161,15 @@ def generate_report(
         raise ValueError("所选时间段内没有任何工作记录，无法生成报告。")
     prompt = build_prompt(template, records, range_label)
     if extra.strip():
-        prompt += f"\n\n补充要求：{extra.strip()}"
+        prompt += (
+            f"\n\nAdditional instructions: {extra.strip()}"
+            if i18n.is_english()
+            else f"\n\n补充要求：{extra.strip()}"
+        )
+    system_prompt = REPORT_SYSTEM_PROMPT_EN if i18n.is_english() else REPORT_SYSTEM_PROMPT
     content = client.chat(
         [
-            {"role": "system", "content": REPORT_SYSTEM_PROMPT},
+            {"role": "system", "content": system_prompt},
             {"role": "user", "content": prompt},
         ],
         model=model or cfg.get("api", "text_model", default="gpt-4o-mini"),

@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from .. import i18n
 from ..analyze import CATEGORIES
 
 
@@ -47,8 +48,10 @@ class RecordEditDialog(QDialog):
 
         self.category_edit = QComboBox()
         self.category_edit.setEditable(True)
-        self.category_edit.addItems(CATEGORIES)
-        self.category_edit.setCurrentText(record.get("category") or "其他")
+        self.category_edit.addItems([i18n.category_display(c) for c in CATEGORIES])
+        self.category_edit.setCurrentText(
+            i18n.category_display(record.get("category") or "其他")
+        )
 
         self.summary_edit = QLineEdit(record.get("summary") or "")
         self.summary_edit.setPlaceholderText("一句话说明做了什么")
@@ -74,6 +77,8 @@ class RecordEditDialog(QDialog):
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
 
+        i18n.translate_widget_tree(self)
+
     def values(self) -> dict:
         start = self.start_edit.dateTime().toString(Qt.ISODate)
         end = self.end_edit.dateTime().toString(Qt.ISODate)
@@ -84,11 +89,12 @@ class RecordEditDialog(QDialog):
             for part in self.tags_edit.text().replace("，", ",").split(",")
             if part.strip()
         ][:3]
+        text = self.category_edit.currentText().strip()
         return {
             "day": start[:10],
             "start_ts": start,
             "end_ts": end,
-            "category": self.category_edit.currentText().strip() or "其他",
+            "category": i18n.category_key(text) if text else "其他",
             "summary": self.summary_edit.text().strip(),
             "details": self.details_edit.toPlainText().strip(),
             "project": self.project_edit.text().strip(),

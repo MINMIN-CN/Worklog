@@ -33,6 +33,9 @@ def _auto_quit_exec(self=None):
 
 QApplication.exec = _auto_quit_exec  # type: ignore[method-assign]
 
+# 本机可能正运行着正式版应用（占用单实例互斥体），测试时跳过该检查
+app_module._single_instance_guard = lambda wait_seconds=0.0: True  # type: ignore[assignment]
+
 code = app_module.main()
 print(f"应用正常启动并退出，exit code = {code}，数据目录 = {TEMP_DIR}")
 sys.exit(code)

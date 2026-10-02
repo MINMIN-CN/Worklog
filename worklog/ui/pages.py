@@ -9,7 +9,7 @@ import time
 from datetime import date, timedelta
 from pathlib import Path
 
-from PySide6.QtCore import QDate, Qt, Signal
+from PySide6.QtCore import QDate, QProcess, Qt, Signal
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtCore import QUrl
 from PySide6.QtWidgets import (
@@ -37,12 +37,12 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .. import APP_NAME, __version__
+from .. import APP_NAME, __version__, i18n
 from ..ai import AIClient, make_client
 from ..analyze import CATEGORIES, extract_todos
-from ..config import DATA_DIR, REPORTS_DIR
+from ..config import DATA_DIR, PROJECT_ROOT, REPORTS_DIR
 from ..providers import all_providers, match_provider, provider_by_key
-from ..reporting import KIND_LABELS, build_timeline_text, generate_report, range_for
+from ..reporting import build_timeline_text, generate_report, kind_label, range_for
 from ..stats import compute_stats, format_duration
 from ..updater import (
     download_installer,
@@ -79,8 +79,10 @@ def edit_record_dialog(parent: QWidget, ctx, record: dict) -> bool:
 def delete_record_dialog(parent: QWidget, ctx, record: dict) -> bool:
     answer = QMessageBox.question(
         parent,
-        "删除记录",
-        f"确定删除 {fmt_time(record.get('start_ts', ''))} 的这条记录吗？",
+        i18n.tr("删除记录"),
+        i18n.tr("确定删除 {time} 的这条记录吗？").format(
+            time=fmt_time(record.get("start_ts", ""))
+        ),
     )
     if answer != QMessageBox.Yes:
         return False
@@ -165,16 +167,25 @@ class TodayPage(QWidget):
         )
         records = self.ctx.db.records_for_day(today)
         stats = compute_stats(records)
-        self.range_label.setText(f"{today} · {len(records)} 个片段")
-        self.card_records.set_value(str(len(records)), f"共采集 {stats['hits']} 次")
-        self.card_duration.set_value(format_duration(stats["duration"]), "按记录时长估算")
+        self.range_label.setText(
+            i18n.tr("{date} · {n} 个片段").format(date=today, n=len(records))
+        )
+        self.card_records.set_value(
+            str(len(records)), i18n.tr("共采集 {n} 次").format(n=stats["hits"])
+        )
+        self.card_duration.set_value(
+            format_duration(stats["duration"]), i18n.tr("按记录时长估算")
+        )
         if stats["first_start"] and stats["last_end"]:
             span = f"{fmt_time(stats['first_start'])}–{fmt_time(stats['last_end'])}"
         else:
             span = "—"
-        self.card_span.set_value(span, "首末活动时间")
-        self.card_todos.set_value(str(self.ctx.db.open_todo_count()), "在待办页管理")
+        self.card_span.set_value(span, i18n.tr("首末活动时间"))
+        self.card_todos.set_value(
+            str(self.ctx.db.open_todo_count()), i18n.tr("在待办页管理")
+        )
         self.list.set_records(list(reversed(records)))
+        i18n.translate_widget_tree(self)
 
     def _edit(self, record: dict) -> None:
         if edit_record_dialog(self, self.ctx, record):
@@ -249,8 +260,11 @@ class TimelinePage(QWidget):
 
     def refresh(self) -> None:
         records = self.ctx.db.records_for_day(self._day())
-        self.count_label.setText(f"· {len(records)} 个片段")
+        self.count_label.setText(
+            i18n.tr("· {n} 个片段").format(n=len(records))
+        )
         self.list.set_records(records)
+        i18n.translate_widget_tree(self)
 
     def _edit(self, record: dict) -> None:
         if edit_record_dialog(self, self.ctx, record):
@@ -277,17 +291,29 @@ class TimelinePage(QWidget):
         day = self._day()
         pending = self.ctx.db.pending_for_day(day)
         if not pending:
-            QMessageBox.information(self, "重新分析", "这一天没有待分析的记录。")
+            QMessageBox.information(
+                self, i18n.tr("重新分析"), i18n.tr("这一天没有待分析的记录。")
+            )
             return
         task = Task(lambda: reanalyze_pending(self.ctx.db, self.ctx.cfg, day), self)
         task.done.connect(self._on_reanalyzed)
-        task.fail.connect(lambda message: QMessageBox.warning(self, "重新分析失败", message))
+        task.fail.connect(
+            lambda message: QMessageBox.warning(
+                self, i18n.tr("重新分析失败"), message
+            )
+        )
         self._task = task
         task.start()
 
     def _on_reanalyzed(self, result) -> None:
         done, total = result
-        QMessageBox.information(self, "重新分析", f"完成：{done}/{total} 条记录已补上分析。")
+        QMessageBox.information(
+            self,
+            i18n.tr("重新分析"),
+            i18n.tr("完成：{done}/{total} 条记录已补上分析。").format(
+                done=done, total=total
+            ),
+        )
         self.refresh()
         self.data_changed.emit()
 
@@ -308,7 +334,11 @@ class StatsPage(QWidget):
         title = QLabel("统计")
         title.setObjectName("pageTitle")
         self.range_combo = QComboBox()
-        self.range_combo.addItems(["今天", "最近 7 天", "本周", "本月", "自定义"])
+        self.range_combo.addItem("今天", "today")
+        self.range_combo.addItem("最近 7 天", "7d")
+        self.range_combo.addItem("本周", "week")
+        self.range_combo.addItem("本月", "month")
+        self.range_combo.addItem("自定义", "custom")
         self.range_combo.currentIndexChanged.connect(self._on_range_changed)
         self.date_edit = QDateEdit(QDate.currentDate())
         self.date_edit.setCalendarPopup(True)
@@ -372,7 +402,7 @@ class StatsPage(QWidget):
         self._on_range_changed()
 
     def _on_range_changed(self) -> None:
-        custom = self.range_combo.currentText() == "自定义"
+        custom = self.range_combo.currentData() == "custom"
         self.date_edit.setVisible(not custom)
         self.start_edit.setVisible(custom)
         self.end_edit.setVisible(custom)
@@ -381,16 +411,16 @@ class StatsPage(QWidget):
         self.refresh()
 
     def _range(self) -> tuple[str, str]:
-        mode = self.range_combo.currentText()
+        mode = self.range_combo.currentData()
         ref = self.date_edit.date().toPython()
-        if mode == "今天":
+        if mode == "today":
             return ref.isoformat(), ref.isoformat()
-        if mode == "最近 7 天":
+        if mode == "7d":
             return (ref - timedelta(days=6)).isoformat(), ref.isoformat()
-        if mode == "本周":
+        if mode == "week":
             start = ref - timedelta(days=ref.weekday())
             return start.isoformat(), (start + timedelta(days=6)).isoformat()
-        if mode == "本月":
+        if mode == "month":
             start = ref.replace(day=1)
             last = (start + timedelta(days=40)).replace(day=1) - timedelta(days=1)
             return start.isoformat(), last.isoformat()
@@ -405,13 +435,17 @@ class StatsPage(QWidget):
         records = self.ctx.db.records_between(start, end)
         stats = compute_stats(records)
         self.card_records.set_value(str(len(records)), f"{start} ~ {end}")
-        self.card_duration.set_value(format_duration(stats["duration"]), "按记录时长估算")
-        self.card_days.set_value(str(stats["active_days"]), "有记录的天数")
-        self.card_hits.set_value(str(stats["hits"]), "自动采集次数")
+        self.card_duration.set_value(format_duration(stats["duration"]), i18n.tr("按记录时长估算"))
+        self.card_days.set_value(str(stats["active_days"]), i18n.tr("有记录的天数"))
+        self.card_hits.set_value(str(stats["hits"]), i18n.tr("自动采集次数"))
         self.app_bars.set_items(stats["by_app"], format_duration)
-        self.category_bars.set_items(stats["by_category"], format_duration)
+        self.category_bars.set_items(
+            [(i18n.category_display(name), value) for name, value in stats["by_category"]],
+            format_duration,
+        )
         self.heatmap.set_data(stats["by_hour"])
         self.tag_cloud.set_tags(stats["tags"])
+        i18n.translate_widget_tree(self)
 
 
 # -------------------------------------------------------------------- 报告页
@@ -499,6 +533,7 @@ class ReportsPage(QWidget):
     def refresh(self) -> None:
         self._refresh_templates()
         self._refresh_history()
+        i18n.translate_widget_tree(self)
 
     def prefill(self, kind: str) -> None:
         for index, (_label, key) in enumerate(self.KIND_LABELS_UI):
@@ -514,7 +549,13 @@ class ReportsPage(QWidget):
         kind = self._kind_key()
         current = self.template_combo.currentText()
         self.template_combo.clear()
-        templates = [t for t in self.ctx.db.templates() if t["kind"] == kind]
+        templates = [
+            t
+            for t in self.ctx.db.templates(i18n.get_language())
+            if t["kind"] == kind
+        ]
+        if not templates:
+            templates = self.ctx.db.templates(i18n.get_language())
         if not templates:
             templates = self.ctx.db.templates()
         for template in templates:
@@ -554,7 +595,7 @@ class ReportsPage(QWidget):
         if report:
             self.preview.setMarkdown(report["content"])
             self.status_label.setText(
-                f"{KIND_LABELS.get(report['kind'], '报告')} · {report['start_day']} ~ {report['end_day']}"
+                f"{kind_label(report['kind'])} · {report['start_day']} ~ {report['end_day']}"
             )
 
     # ------------------------------------------------------------- 生成报告
@@ -564,21 +605,25 @@ class ReportsPage(QWidget):
         start, end, label = range_for(kind, ref)
         records = self.ctx.db.records_between(start, end)
         if not records:
-            QMessageBox.information(self, "生成报告", f"{label} 没有任何工作记录。")
+            QMessageBox.information(
+                self,
+                i18n.tr("生成报告"),
+                i18n.tr("{label} 没有任何工作记录。").format(label=label),
+            )
             return
         template = self._current_template()
         if template is None:
-            QMessageBox.warning(self, "生成报告", "没有可用模板。")
+            QMessageBox.warning(self, i18n.tr("生成报告"), i18n.tr("没有可用模板。"))
             return
 
         self.generate_btn.setEnabled(False)
-        self.status_label.setText("正在生成，请稍候…")
+        self.status_label.setText(i18n.tr("正在生成，请稍候…"))
         extra = self.extra_edit.text()
 
         def run():
             client = make_client(self.ctx.cfg)
             content = generate_report(client, records, template, label, self.ctx.cfg, extra=extra)
-            title = f"{label} {KIND_LABELS.get(kind, '报告')}"
+            title = f"{label} {kind_label(kind)}"
             return kind, start, end, label, title, content, template["name"]
 
         task = Task(run, self)
@@ -596,7 +641,7 @@ class ReportsPage(QWidget):
         except Exception:
             pass
         self.generate_btn.setEnabled(True)
-        self.status_label.setText("已生成并保存")
+        self.status_label.setText(i18n.tr("已生成并保存"))
         self._refresh_history()
         for row in range(self.history.count()):
             item = self.history.item(row)
@@ -607,37 +652,44 @@ class ReportsPage(QWidget):
 
     def _on_generate_failed(self, message: str) -> None:
         self.generate_btn.setEnabled(True)
-        self.status_label.setText("生成失败")
-        QMessageBox.warning(self, "生成失败", message)
+        self.status_label.setText(i18n.tr("生成失败"))
+        QMessageBox.warning(self, i18n.tr("生成失败"), message)
 
     # ------------------------------------------------------------- 操作按钮
     def _copy(self) -> None:
         text = self.preview.toPlainText().strip()
         if text:
             QApplication.clipboard().setText(text)
-            self.status_label.setText("已复制到剪贴板")
+            self.status_label.setText(i18n.tr("已复制到剪贴板"))
 
     def _save_as(self) -> None:
         text = self.preview.toPlainText().strip()
         if not text:
             return
         default = str(REPORTS_DIR / f"{self.date_edit.date().toString('yyyyMMdd')}_{self._kind_key()}.md")
-        filename, _ = QFileDialog.getSaveFileName(self, "另存为", default, "Markdown (*.md)")
+        filename, _ = QFileDialog.getSaveFileName(
+            self, i18n.tr("另存为"), default, "Markdown (*.md)"
+        )
         if filename:
             Path(filename).write_text(text, encoding="utf-8")
-            self.status_label.setText("已保存")
+            self.status_label.setText(i18n.tr("已保存"))
 
     def _delete(self) -> None:
         current = self.history.currentItem()
         if current is None:
             return
         report_id = int(current.data(Qt.UserRole))
-        if QMessageBox.question(self, "删除报告", "确定删除这份报告吗？") != QMessageBox.Yes:
+        if (
+            QMessageBox.question(
+                self, i18n.tr("删除报告"), i18n.tr("确定删除这份报告吗？")
+            )
+            != QMessageBox.Yes
+        ):
             return
         self.ctx.db.delete_report(report_id)
         self.preview.clear()
         self._refresh_history()
-        self.status_label.setText("已删除")
+        self.status_label.setText(i18n.tr("已删除"))
 
 
 # -------------------------------------------------------------------- 待办页
@@ -662,13 +714,15 @@ class TodoRow(QFrame):
             title.setStyleSheet("color:#6f7890; text-decoration: line-through;")
         title.setWordWrap(True)
 
-        due = QLabel(f"截止 {todo['due']}" if todo.get("due") else "")
+        due = QLabel(
+            i18n.tr("截止 {date}").format(date=todo["due"]) if todo.get("due") else ""
+        )
         due.setObjectName("muted")
-        source = QLabel(todo.get("source") or "")
+        source = QLabel(i18n.tr(todo.get("source") or ""))
         source.setObjectName("muted")
         source.setFixedWidth(52)
 
-        delete_btn = QPushButton("删除")
+        delete_btn = QPushButton(i18n.tr("删除"))
         delete_btn.setObjectName("ghost")
         delete_btn.setFixedWidth(56)
         delete_btn.clicked.connect(lambda: self.delete_requested.emit(self.todo))
@@ -773,7 +827,12 @@ class TodosPage(QWidget):
             row.delete_requested.connect(self._on_delete)
             self.list_layout.insertWidget(index, row)
         open_count = self.ctx.db.open_todo_count()
-        self.count_label.setText(f"· {open_count} 项未完成 / 共 {len(todos)} 项")
+        self.count_label.setText(
+            i18n.tr("· {open} 项未完成 / 共 {total} 项").format(
+                open=open_count, total=len(todos)
+            )
+        )
+        i18n.translate_widget_tree(self)
 
     def _add(self) -> None:
         title = self.input.text().strip()
@@ -791,7 +850,14 @@ class TodosPage(QWidget):
         self.data_changed.emit()
 
     def _on_delete(self, todo: dict) -> None:
-        if QMessageBox.question(self, "删除待办", f"删除「{todo['title']}」？") != QMessageBox.Yes:
+        if (
+            QMessageBox.question(
+                self,
+                i18n.tr("删除待办"),
+                i18n.tr("删除「{title}」？").format(title=todo["title"]),
+            )
+            != QMessageBox.Yes
+        ):
             return
         self.ctx.db.delete_todo(int(todo["id"]))
         self.refresh()
@@ -801,13 +867,19 @@ class TodosPage(QWidget):
         day = self.extract_date.date().toString("yyyy-MM-dd")
         records = self.ctx.db.records_for_day(day)
         if not records:
-            QMessageBox.information(self, "提取待办", f"{day} 没有工作记录。")
+            QMessageBox.information(
+                self,
+                i18n.tr("提取待办"),
+                i18n.tr("{day} 没有工作记录。").format(day=day),
+            )
             return
         if not self.ctx.cfg.get("api", "api_key", default=""):
-            QMessageBox.warning(self, "提取待办", "请先在「设置」里配置 AI 接口。")
+            QMessageBox.warning(
+                self, i18n.tr("提取待办"), i18n.tr("请先在「设置」里配置 AI 接口。")
+            )
             return
         self.extract_btn.setEnabled(False)
-        self.status_label.setText("正在提取…")
+        self.status_label.setText(i18n.tr("正在提取…"))
         timeline = build_timeline_text(records)
 
         def run():
@@ -833,14 +905,18 @@ class TodosPage(QWidget):
                 day=day,
             )
             count += 1
-        self.status_label.setText(f"提取到 {count} 条待办" if count else "没有提取到明确的待办")
+        self.status_label.setText(
+            i18n.tr("提取到 {n} 条待办").format(n=count)
+            if count
+            else i18n.tr("没有提取到明确的待办")
+        )
         self.refresh()
         self.data_changed.emit()
 
     def _on_extract_failed(self, message: str) -> None:
         self.extract_btn.setEnabled(True)
-        self.status_label.setText("提取失败")
-        QMessageBox.warning(self, "提取失败", message)
+        self.status_label.setText(i18n.tr("提取失败"))
+        QMessageBox.warning(self, i18n.tr("提取失败"), message)
 
 
 # -------------------------------------------------------------------- 设置页
@@ -861,6 +937,24 @@ class SettingsPage(QWidget):
         title.setObjectName("pageTitle")
         layout.addWidget(title)
 
+        # ---- 界面语言
+        language_card = Card("界面语言 / Language")
+        language_row = QHBoxLayout()
+        language_label = QLabel("语言")
+        language_label.setFixedWidth(64)
+        self.language_combo = QComboBox()
+        for key, label in i18n.LANGUAGES.items():
+            self.language_combo.addItem(label, key)
+        saved_language = cfg.get("ui", "language", default="auto") or "auto"
+        language_index = self.language_combo.findData(saved_language)
+        if language_index >= 0:
+            self.language_combo.setCurrentIndex(language_index)
+        language_row.addWidget(language_label)
+        language_row.addWidget(self.language_combo, 1)
+        language_row.addStretch(1)
+        language_card.add_layout(language_row)
+        layout.addWidget(language_card)
+
         # ---- API
         api_card = Card("AI 模型接口")
         provider_row = QHBoxLayout()
@@ -868,7 +962,7 @@ class SettingsPage(QWidget):
         provider_label.setFixedWidth(64)
         self.provider_combo = QComboBox()
         for provider in all_providers():
-            self.provider_combo.addItem(provider.name, provider.key)
+            self.provider_combo.addItem(i18n.tr(provider.name), provider.key)
         self.provider_combo.currentIndexChanged.connect(
             lambda _index: self._on_provider_changed()
         )
@@ -909,7 +1003,7 @@ class SettingsPage(QWidget):
         self.timeout_spin = QSpinBox()
         self.timeout_spin.setRange(10, 600)
         self.timeout_spin.setValue(int(cfg.get("api", "timeout", default=120)))
-        self.timeout_spin.setSuffix(" 秒")
+        self.timeout_spin.setSuffix(i18n.tr(" 秒"))
         self.max_width_spin = QSpinBox()
         self.max_width_spin.setRange(640, 4096)
         self.max_width_spin.setSingleStep(160)
@@ -952,11 +1046,11 @@ class SettingsPage(QWidget):
         self.interval_spin.setRange(10, 7200)
         self.interval_spin.setSingleStep(10)
         self.interval_spin.setValue(int(cfg.get("capture", "interval_sec", default=120)))
-        self.interval_spin.setSuffix(" 秒")
+        self.interval_spin.setSuffix(i18n.tr(" 秒"))
         self.monitor_combo = QComboBox()
         self.monitor_combo.addItem("所有屏幕（合成）", 0)
         for index in range(1, monitor_count() + 1):
-            self.monitor_combo.addItem(f"显示器 {index}", index)
+            self.monitor_combo.addItem(i18n.tr("显示器 {n}").format(n=index), index)
         saved_monitor = int(cfg.get("capture", "monitor", default=1) or 1)
         combo_index = self.monitor_combo.findData(saved_monitor)
         if combo_index >= 0:
@@ -965,7 +1059,7 @@ class SettingsPage(QWidget):
         self.idle_spin.setRange(60, 3600)
         self.idle_spin.setSingleStep(60)
         self.idle_spin.setValue(int(cfg.get("capture", "idle_seconds", default=300)))
-        self.idle_spin.setSuffix(" 秒")
+        self.idle_spin.setSuffix(i18n.tr(" 秒"))
         self.excluded_edit = QPlainTextEdit(
             "\n".join(cfg.get("capture", "excluded_apps", default=[]) or [])
         )
@@ -1018,7 +1112,9 @@ class SettingsPage(QWidget):
 
         # ---- 数据
         data_card = Card("数据")
-        data_path_label = QLabel(f"当前数据目录：{DATA_DIR}")
+        data_path_label = QLabel(
+            i18n.tr("当前数据目录：{path}").format(path=DATA_DIR)
+        )
         data_path_label.setObjectName("muted")
         data_path_label.setWordWrap(True)
         data_path_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
@@ -1041,7 +1137,9 @@ class SettingsPage(QWidget):
 
         # ---- 关于与更新
         update_card = Card("关于与更新")
-        version_label = QLabel(f"当前版本：v{__version__}")
+        version_label = QLabel(
+            i18n.tr("当前版本：v{version}").format(version=__version__)
+        )
         version_label.setObjectName("muted")
         update_card.add(version_label)
         update_row = QHBoxLayout()
@@ -1081,6 +1179,21 @@ class SettingsPage(QWidget):
         outer.setContentsMargins(0, 0, 0, 0)
         outer.addWidget(_make_scroll_page(inner))
 
+        i18n.translate_widget_tree(self)
+
+    def _restart_app(self) -> None:
+        """重启应用（切换语言或需要重新初始化时使用）。"""
+        try:
+            if getattr(sys, "frozen", False):
+                QProcess.startDetached(sys.executable, ["--wait-instance"])
+            else:
+                QProcess.startDetached(
+                    sys.executable, ["-m", "worklog"], str(PROJECT_ROOT)
+                )
+        except Exception:
+            return
+        QApplication.quit()
+
     def _init_provider_selection(self) -> None:
         saved_key = self.ctx.cfg.get("api", "provider", default="") or ""
         provider = provider_by_key(saved_key)
@@ -1103,9 +1216,9 @@ class SettingsPage(QWidget):
         provider = provider_by_key(self.provider_combo.currentData())
         if provider is None or provider.key == "custom":
             self.provider_hint.setText(
-                "手动填写接口地址（以 /v1 结尾）和模型名，任何 OpenAI 兼容接口都可以。"
+                i18n.tr("手动填写接口地址（以 /v1 结尾）和模型名，任何 OpenAI 兼容接口都可以。")
             )
-            self.api_key.setPlaceholderText("粘贴你的 API Key")
+            self.api_key.setPlaceholderText(i18n.tr("粘贴你的 API Key"))
             return
         if not initial:
             self.base_url.setText(provider.base_url)
@@ -1120,8 +1233,8 @@ class SettingsPage(QWidget):
             self.vision_model.setText(provider.vision_model)
         if not self.text_model.text().strip() and provider.text_model:
             self.text_model.setText(provider.text_model)
-        self.provider_hint.setText(provider.hint)
-        self.api_key.setPlaceholderText(provider.key_placeholder)
+        self.provider_hint.setText(i18n.tr(provider.hint))
+        self.api_key.setPlaceholderText(i18n.tr(provider.key_placeholder))
         if provider.key == "ollama" and not self.api_key.text().strip():
             self.api_key.setText("ollama")
         if not self.api_key.text().strip():
@@ -1129,7 +1242,7 @@ class SettingsPage(QWidget):
 
     def _check_update(self) -> None:
         source = resolve_manifest_url(self.ctx.cfg)
-        self.update_status.setText("正在检查更新…")
+        self.update_status.setText(i18n.tr("正在检查更新…"))
         self.check_update_btn.setEnabled(False)
         task = Task(lambda: fetch_manifest(source), self)
         task.done.connect(self._on_update_manifest)
@@ -1139,27 +1252,35 @@ class SettingsPage(QWidget):
 
     def _on_update_failed(self, message: str) -> None:
         self.check_update_btn.setEnabled(True)
-        self.update_status.setText(f"检查失败：{message}")
+        self.update_status.setText(
+            i18n.tr("检查失败：{message}").format(message=message)
+        )
 
     def _on_update_manifest(self, manifest: dict) -> None:
         self.check_update_btn.setEnabled(True)
         remote = str(manifest.get("version") or "")
         if not is_newer(remote):
-            self.update_status.setText(f"已是最新版本（v{__version__}）")
+            self.update_status.setText(
+                i18n.tr("已是最新版本（v{version}）").format(version=__version__)
+            )
             return
         notes = str(manifest.get("notes") or "").strip()
-        message = f"发现新版本 v{remote}（当前 v{__version__}）"
+        message = i18n.tr("发现新版本 v{remote}（当前 v{current}）").format(
+            remote=remote, current=__version__
+        )
         if notes:
             message += f"\n\n{notes}"
-        message += "\n\n是否立即下载并自动安装？安装完成后程序会自动重新打开。"
-        if QMessageBox.question(self, "发现新版本", message) != QMessageBox.Yes:
-            self.update_status.setText(f"发现新版本 v{remote}，可稍后再更新")
+        message += "\n\n" + i18n.tr("是否立即下载并自动安装？安装完成后程序会自动重新打开。")
+        if QMessageBox.question(self, i18n.tr("发现新版本"), message) != QMessageBox.Yes:
+            self.update_status.setText(
+                i18n.tr("发现新版本 v{remote}，可稍后再更新").format(remote=remote)
+            )
             return
         url = str(manifest.get("url") or "")
         if not url:
-            self.update_status.setText("更新清单缺少下载地址 url")
+            self.update_status.setText(i18n.tr("更新清单缺少下载地址 url"))
             return
-        self.update_status.setText("正在下载安装包…")
+        self.update_status.setText(i18n.tr("正在下载安装包…"))
         self.check_update_btn.setEnabled(False)
         task = Task(lambda: download_installer(url), self)
         task.done.connect(self._on_update_downloaded)
@@ -1169,12 +1290,14 @@ class SettingsPage(QWidget):
 
     def _on_update_downloaded(self, path) -> None:
         self.check_update_btn.setEnabled(True)
-        self.update_status.setText(f"下载完成：{path}")
+        self.update_status.setText(
+            i18n.tr("下载完成：{path}").format(path=path)
+        )
         self._run_installer(Path(path))
 
     def _pick_installer(self) -> None:
         filename, _ = QFileDialog.getOpenFileName(
-            self, "选择新版本安装包", "", "安装包 (*.exe)"
+            self, i18n.tr("选择新版本安装包"), "", i18n.tr("安装包 (*.exe)")
         )
         if not filename:
             return
@@ -1183,16 +1306,17 @@ class SettingsPage(QWidget):
     def _run_installer(self, installer: Path) -> None:
         answer = QMessageBox.question(
             self,
-            "自动更新",
-            f"即将安装：\n{installer}\n\n"
-            "程序会先退出，安装完成后自动重新打开；工作数据会保留。\n\n继续吗？",
+            i18n.tr("自动更新"),
+            i18n.tr(
+                "即将安装：\n{path}\n\n程序会先退出，安装完成后自动重新打开；工作数据会保留。\n\n继续吗？"
+            ).format(path=installer),
         )
         if answer != QMessageBox.Yes:
             return
         try:
             launch_update(installer)
         except Exception as exc:
-            QMessageBox.warning(self, "更新失败", str(exc))
+            QMessageBox.warning(self, i18n.tr("更新失败"), str(exc))
             return
         QApplication.quit()
 
@@ -1202,8 +1326,11 @@ class SettingsPage(QWidget):
             for line in self.excluded_edit.toPlainText().splitlines()
             if line.strip()
         ]
+        previous_language = self.ctx.cfg.get("ui", "language", default="auto")
+        new_language = self.language_combo.currentData() or "auto"
         self.ctx.cfg.update(
             {
+                "ui": {"language": new_language},
                 "api": {
                     "provider": self.provider_combo.currentData(),
                     "base_url": self.base_url.text().strip(),
@@ -1232,7 +1359,18 @@ class SettingsPage(QWidget):
                 },
             }
         )
-        self.save_status.setText("已保存（API 端口修改需重启应用）")
+        self.save_status.setText(i18n.tr("已保存（API 端口修改需重启应用）"))
+        if (
+            new_language != previous_language
+            and i18n.resolve_language(new_language) != i18n.get_language()
+        ):
+            answer = QMessageBox.question(
+                self,
+                i18n.tr("界面语言已更改"),
+                i18n.tr("需要重启应用才能生效，是否立即重启？"),
+            )
+            if answer == QMessageBox.Yes:
+                self._restart_app()
 
     def _test_connection(self) -> None:
         base_url = self.base_url.text().strip()
@@ -1241,12 +1379,19 @@ class SettingsPage(QWidget):
         text_model = self.text_model.text().strip()
         timeout = int(self.timeout_spin.value())
         if not base_url:
-            self.test_status.setText("请先选择服务商或填写接口地址")
+            self.test_status.setText(i18n.tr("请先选择服务商或填写接口地址"))
             return
         if not api_key:
-            self.test_status.setText("请先填写 API Key")
+            self.test_status.setText(i18n.tr("请先填写 API Key"))
             return
-        self.test_status.setText("测试中，请稍候…")
+        self.test_status.setText(i18n.tr("测试中，请稍候…"))
+
+        ping_prompt = (
+            "Reply with exactly two letters: OK"
+            if i18n.is_english()
+            else "请只回复两个字母：OK"
+        )
+        separator = "; " if i18n.is_english() else "；"
 
         def run():
             import base64
@@ -1258,13 +1403,13 @@ class SettingsPage(QWidget):
             notes: list[str] = []
             try:
                 client.chat(
-                    [{"role": "user", "content": "请只回复两个字母：OK"}],
+                    [{"role": "user", "content": ping_prompt}],
                     model=text_model,
                     max_tokens=10,
                 )
-                notes.append("文本模型正常")
+                notes.append(i18n.tr("文本模型正常"))
             except Exception as exc:
-                notes.append(f"文本模型失败（{exc}）")
+                notes.append(i18n.tr("文本模型失败（{message}）").format(message=exc))
             try:
                 buffer = io.BytesIO()
                 PILImage.new("RGB", (32, 32), (255, 255, 255)).save(
@@ -1278,7 +1423,7 @@ class SettingsPage(QWidget):
                         {
                             "role": "user",
                             "content": [
-                                {"type": "text", "text": "请只回复两个字母：OK"},
+                                {"type": "text", "text": ping_prompt},
                                 {
                                     "type": "image_url",
                                     "image_url": {"url": data_url},
@@ -1289,23 +1434,31 @@ class SettingsPage(QWidget):
                     model=vision_model,
                     max_tokens=10,
                 )
-                notes.append("视觉模型正常")
+                notes.append(i18n.tr("视觉模型正常"))
             except Exception as exc:
-                notes.append(f"视觉模型失败（{exc}）")
+                notes.append(i18n.tr("视觉模型失败（{message}）").format(message=exc))
             client.close()
-            return "；".join(notes)
+            return separator.join(notes)
 
         task = Task(run, self)
         task.done.connect(
-            lambda text: self.test_status.setText(text + "。确认无误后点「保存设置」")
+            lambda text: self.test_status.setText(
+                i18n.tr("{result}。确认无误后点「保存设置」").format(result=text)
+            )
         )
-        task.fail.connect(lambda message: self.test_status.setText(f"失败：{message}"))
+        task.fail.connect(
+            lambda message: self.test_status.setText(
+                i18n.tr("失败：{message}").format(message=message)
+            )
+        )
         self._task = task
         task.start()
 
     def _export(self) -> None:
         default = str(DATA_DIR / "worklog_export.json")
-        filename, _ = QFileDialog.getSaveFileName(self, "导出数据", default, "JSON (*.json)")
+        filename, _ = QFileDialog.getSaveFileName(
+            self, i18n.tr("导出数据"), default, "JSON (*.json)"
+        )
         if not filename:
             return
         payload = {
@@ -1320,17 +1473,17 @@ class SettingsPage(QWidget):
             json.dumps(payload, ensure_ascii=False, indent=2, default=str),
             encoding="utf-8",
         )
-        self.save_status.setText("已导出")
+        self.save_status.setText(i18n.tr("已导出"))
 
     def _clear(self) -> None:
         answer = QMessageBox.warning(
             self,
-            "清空所有记录",
-            "将删除全部工作记录（报告和待办保留），且不可恢复。确定继续吗？",
+            i18n.tr("清空所有记录"),
+            i18n.tr("将删除全部工作记录（报告和待办保留），且不可恢复。确定继续吗？"),
             QMessageBox.Yes | QMessageBox.No,
             QMessageBox.No,
         )
         if answer != QMessageBox.Yes:
             return
         self.ctx.db.clear_records()
-        self.save_status.setText("已清空所有记录")
+        self.save_status.setText(i18n.tr("已清空所有记录"))

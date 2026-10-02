@@ -162,6 +162,7 @@ DEFAULT_CONFIG: dict = {
     },
     "ui": {
         "close_to_tray": True,
+        "language": "auto",
     },
     "update": {
         "manifest_url": "",
