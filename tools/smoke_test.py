@@ -328,6 +328,12 @@ def test_i18n() -> None:
         "模型服务异常（HTTP {status}）",
         "接口返回错误（HTTP {status}）：{snippet}",
         "安装包不存在：{path}",
+        "无法连接任何下载线路，请检查网络后重试",
+        "正在测试下载线路…",
+        "正在下载 {done}/{total} MB · {speed}/s · {source}",
+        "已取消下载",
+        "取消",
+        "更新",
     ]
     missing = [key for key in dynamic_keys if key not in i18n.EN]
     assert not missing, f"缺少英文条目：{missing}"

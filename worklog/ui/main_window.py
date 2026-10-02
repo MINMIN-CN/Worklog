@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from PySide6.QtCore import QTimer
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (
     QApplication,
     QHBoxLayout,
@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QMenu,
     QMessageBox,
+    QProgressDialog,
     QPushButton,
     QStackedWidget,
     QSystemTrayIcon,
@@ -35,7 +36,7 @@ from .pages import (
     TodayPage,
     TodosPage,
 )
-from .widgets import Task, make_icon, refresh_style
+from .widgets import ProgressTask, Task, make_icon, refresh_style
 
 STATUS_LABELS = {
     "recording": "记录中",
@@ -203,18 +204,76 @@ class MainWindow(QMainWindow):
         if not url:
             self._show_message(i18n.tr("更新清单缺少下载地址 url"))
             return
-        self._show_message(i18n.tr("正在下载新版本…"))
-        task = Task(lambda: download_installer(url), self)
-        task.done.connect(self._install_downloaded)
-        task.fail.connect(
-            lambda message: self._show_message(
-                i18n.tr("下载失败：{message}").format(message=message)
-            )
+        mirrors = manifest.get("mirror_prefixes") or manifest.get("mirrors") or []
+        self._download_dialog = QProgressDialog(
+            i18n.tr("正在测试下载线路…"), i18n.tr("取消"), 0, 100, self
         )
+        self._download_dialog.setWindowTitle(i18n.tr("更新"))
+        self._download_dialog.setWindowModality(Qt.WindowModal)
+        self._download_dialog.setMinimumDuration(0)
+        self._download_dialog.setValue(0)
+        self._download_dialog.canceled.connect(self._cancel_download)
+        task = ProgressTask(
+            lambda report, cancel: download_installer(
+                url,
+                progress=report,
+                cancel=cancel,
+                extra_mirrors=list(mirrors),
+                cfg=self.ctx.cfg,
+            ),
+            self,
+        )
+        task.progress.connect(self._on_download_progress)
+        task.done.connect(self._install_downloaded)
+        task.fail.connect(self._on_download_failed)
+        task.cancelled.connect(self._on_download_cancelled)
         self._update_task = task
         task.start()
 
+    def _cancel_download(self) -> None:
+        task = getattr(self, "_update_task", None)
+        if isinstance(task, ProgressTask):
+            task.cancel()
+
+    def _close_download_dialog(self) -> None:
+        dialog = getattr(self, "_download_dialog", None)
+        if dialog is not None:
+            dialog.close()
+            self._download_dialog = None
+
+    def _on_download_progress(
+        self, done: int, total: int, speed: float, source: str
+    ) -> None:
+        dialog = getattr(self, "_download_dialog", None)
+        if dialog is None:
+            return
+        if total <= 0:
+            dialog.setLabelText(i18n.tr("正在测试下载线路…"))
+            return
+        dialog.setValue(min(100, int(done * 100 / total)))
+        mb = 1024 * 1024
+        speed_text = (
+            f"{speed / mb:.2f} MB" if speed >= mb else f"{speed / 1024:.0f} KB"
+        )
+        dialog.setLabelText(
+            i18n.tr("正在下载 {done}/{total} MB · {speed}/s · {source}").format(
+                done=f"{done / mb:.1f}",
+                total=f"{total / mb:.1f}",
+                speed=speed_text,
+                source=source or "—",
+            )
+        )
+
+    def _on_download_cancelled(self) -> None:
+        self._close_download_dialog()
+        self._show_message(i18n.tr("已取消下载"))
+
+    def _on_download_failed(self, message: str) -> None:
+        self._close_download_dialog()
+        self._show_message(i18n.tr("下载失败：{message}").format(message=message))
+
     def _install_downloaded(self, path) -> None:
+        self._close_download_dialog()
         try:
             launch_update(path)
         except Exception as exc:

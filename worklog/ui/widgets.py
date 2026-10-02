@@ -274,6 +274,50 @@ class Task(QObject):
         self.done.emit(result)
 
 
+class ProgressTask(QObject):
+    """带进度和取消的后台任务。
+
+    fn(report, cancel) -> result；report(done, total, speed, source) 可在任意线程调用。
+    """
+
+    progress = Signal(int, int, float, str)
+    done = Signal(object)
+    fail = Signal(str)
+    cancelled = Signal()
+
+    def __init__(self, fn, parent: QObject | None = None):
+        super().__init__(parent)
+        self._fn = fn
+        self._cancel = threading.Event()
+        self._thread: threading.Thread | None = None
+
+    def start(self) -> None:
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread.start()
+
+    def cancel(self) -> None:
+        self._cancel.set()
+
+    def _report(self, done, total, speed, source) -> None:
+        self.progress.emit(int(done), int(total), float(speed), str(source))
+
+    def _run(self) -> None:
+        from ..updater import DownloadCancelled
+
+        try:
+            result = self._fn(self._report, self._cancel)
+        except DownloadCancelled:
+            self.cancelled.emit()
+            return
+        except Exception as exc:
+            if self._cancel.is_set():
+                self.cancelled.emit()
+            else:
+                self.fail.emit(str(exc))
+            return
+        self.done.emit(result)
+
+
 class RecordCard(QFrame):
     edit_requested = Signal(dict)
     delete_requested = Signal(dict)

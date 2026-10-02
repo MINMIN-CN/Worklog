@@ -117,6 +117,8 @@ curl "http://127.0.0.1:8765/api/timeline?date=2026-10-02"
 - 点「检查更新」：从本项目的 GitHub Releases 获取最新版本，有新版本时提示，一键下载、静默安装并自动重启
 - 点「选择安装包升级」：手动选择一个新版安装包，程序退出后自动升级并重启
 - 「启动时自动检查更新」默认开启；检查失败（断网、无法访问等）会静默跳过，不弹错误
+- 下载会自动并发测速并从多条 GitHub 加速线路中选最快的一条（内置 gh-proxy / ghfast / ghproxy.net 等），使用多连接分段下载，失败自动切换线路
+- 下载时显示进度条、实时速度和当前线路，可随时取消
 
 **内置更新源**（普通用户不需要填写任何地址）：
 
@@ -149,8 +151,8 @@ https://github.com/MINMIN-CN/Worklog/releases/latest/download/manifest.json
 3. 用 GitHub CLI 发布 Release，把安装包和 manifest 作为资源上传：
 
 ```bat
-gh release create v0.5.0 "dist\installer\WorkLog-Setup-0.5.0.exe" "update\manifest.json" ^
-  --title "工作小记 v0.5.0" --notes "更新说明"
+gh release create v0.5.1 "dist\installer\WorkLog-Setup-0.5.1.exe" "update\manifest.json" ^
+  --title "工作小记 v0.5.1" --notes "更新说明"
 ```
 
 4. 应用会自动通过 `releases/latest/download/manifest.json` 发现新版本。
@@ -230,7 +232,7 @@ packaging\build.bat
 
 它会依次：生成图标 → PyInstaller 打包（onedir，输出 `dist\WorkLog\`）→ Inno Setup 生成安装包。
 
-产物：`dist\installer\WorkLog-Setup-0.5.0.exe`，安装包特性：
+产物：`dist\installer\WorkLog-Setup-0.5.1.exe`，安装包特性：
 
 - 默认按用户安装（无需管理员权限），路径 `%LOCALAPPDATA%\Programs\工作小记`
 - 安装向导支持**简体中文 / English**，自动匹配系统语言

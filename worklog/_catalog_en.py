@@ -338,5 +338,10 @@ CATEGORY_EN: dict[str, str] = {
 EN.update(
     {
         "· {open} 项未完成 / 共 {total} 项": "· {open} open / {total} total",
+        "更新": "Update",
+        "正在测试下载线路…": "Testing download sources…",
+        "正在下载 {done}/{total} MB · {speed}/s · {source}": "Downloading {done}/{total} MB · {speed}/s · {source}",
+        "已取消下载": "Download cancelled",
+        "无法连接任何下载线路，请检查网络后重试": "Could not reach any download source. Check your network and try again.",
     }
 )

@@ -167,6 +167,7 @@ DEFAULT_CONFIG: dict = {
     "update": {
         "manifest_url": "",
         "auto_check": True,
+        "mirror_prefixes": [],
     },
 }
 

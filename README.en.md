@@ -116,6 +116,8 @@ Under "Settings → About & Updates" you can:
 - Click "Check for updates": fetch the latest version from this project's GitHub Releases; if a newer version exists you'll be prompted, and one click downloads, installs silently, and restarts automatically
 - Click "Upgrade from installer": manually select a new installer; after the app exits it upgrades and restarts automatically
 - "Check for updates at startup" is enabled by default; if the check fails (offline, unreachable, etc.) it is skipped silently with no error dialog
+- Downloads automatically probe multiple GitHub acceleration mirrors (gh-proxy / ghfast / ghproxy.net by default), pick the fastest one, use multi-connection segmented downloading, and fail over to another mirror automatically
+- A progress bar, live speed and the current mirror are shown during download, and you can cancel at any time
 
 **Built-in update source** (regular users don't need to enter any URL):
 
@@ -148,7 +150,7 @@ Update manifest format:
 3. Publish a Release with the GitHub CLI, uploading the installer and manifest as assets:
 
 ```bat
-gh release create v0.5.0 "dist\installer\WorkLog-Setup-0.5.0.exe" "update\manifest.json" ^
+gh release create v0.5.1 "dist\installer\WorkLog-Setup-0.5.1.exe" "update\manifest.json" ^
   --title "WorkLog v0.5.0" --notes "Release notes"
 ```
 
@@ -228,7 +230,7 @@ packaging\build.bat
 
 It runs in sequence: generate icons → PyInstaller packaging (onedir, output to `dist\WorkLog\`) → Inno Setup to build the installer.
 
-Output: `dist\installer\WorkLog-Setup-0.5.0.exe`. Installer features:
+Output: `dist\installer\WorkLog-Setup-0.5.1.exe`. Installer features:
 
 - Per-user install by default (no administrator rights required), at `%LOCALAPPDATA%\Programs\工作小记`
 - The installer wizard supports **Simplified Chinese / English** and matches the system language automatically

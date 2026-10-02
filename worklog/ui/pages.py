@@ -28,6 +28,7 @@ from PySide6.QtWidgets import (
     QListWidgetItem,
     QMessageBox,
     QPlainTextEdit,
+    QProgressBar,
     QPushButton,
     QScrollArea,
     QSpinBox,
@@ -57,6 +58,7 @@ from .widgets import (
     BarListWidget,
     Card,
     HeatmapWidget,
+    ProgressTask,
     RecordListWidget,
     StatCard,
     TagCloudWidget,
@@ -1151,10 +1153,21 @@ class SettingsPage(QWidget):
         self.update_status = QLabel("")
         self.update_status.setObjectName("muted")
         self.update_status.setWordWrap(True)
+        self.cancel_download_btn = QPushButton(i18n.tr("取消"))
+        self.cancel_download_btn.setObjectName("ghost")
+        self.cancel_download_btn.setVisible(False)
+        self.cancel_download_btn.clicked.connect(self._cancel_download)
         update_row.addWidget(self.check_update_btn)
         update_row.addWidget(self.pick_installer_btn)
+        update_row.addWidget(self.cancel_download_btn)
         update_row.addWidget(self.update_status, 1)
         update_card.add_layout(update_row)
+        self.update_progress = QProgressBar()
+        self.update_progress.setRange(0, 1000)
+        self.update_progress.setTextVisible(False)
+        self.update_progress.setFixedHeight(8)
+        self.update_progress.setVisible(False)
+        update_card.add(self.update_progress)
         self.auto_update_check = QCheckBox("启动时自动检查更新（推荐）")
         self.auto_update_check.setChecked(bool(cfg.get("update", "auto_check", default=True)))
         update_card.add(self.auto_update_check)
@@ -1251,7 +1264,7 @@ class SettingsPage(QWidget):
         task.start()
 
     def _on_update_failed(self, message: str) -> None:
-        self.check_update_btn.setEnabled(True)
+        self._finish_download_ui()
         self.update_status.setText(
             i18n.tr("检查失败：{message}").format(message=message)
         )
@@ -1280,16 +1293,69 @@ class SettingsPage(QWidget):
         if not url:
             self.update_status.setText(i18n.tr("更新清单缺少下载地址 url"))
             return
-        self.update_status.setText(i18n.tr("正在下载安装包…"))
+        mirrors = manifest.get("mirror_prefixes") or manifest.get("mirrors") or []
+        self.update_status.setText(i18n.tr("正在测试下载线路…"))
+        self.update_progress.setVisible(True)
+        self.update_progress.setValue(0)
+        self.cancel_download_btn.setVisible(True)
         self.check_update_btn.setEnabled(False)
-        task = Task(lambda: download_installer(url), self)
+        self.pick_installer_btn.setEnabled(False)
+        task = ProgressTask(
+            lambda report, cancel: download_installer(
+                url,
+                progress=report,
+                cancel=cancel,
+                extra_mirrors=list(mirrors),
+                cfg=self.ctx.cfg,
+            ),
+            self,
+        )
+        task.progress.connect(self._on_download_progress)
         task.done.connect(self._on_update_downloaded)
         task.fail.connect(self._on_update_failed)
+        task.cancelled.connect(self._on_download_cancelled)
         self._update_task = task
         task.start()
 
-    def _on_update_downloaded(self, path) -> None:
+    def _cancel_download(self) -> None:
+        task = getattr(self, "_update_task", None)
+        if isinstance(task, ProgressTask):
+            task.cancel()
+
+    def _on_download_progress(
+        self, done: int, total: int, speed: float, source: str
+    ) -> None:
+        if total <= 0:
+            self.update_status.setText(i18n.tr("正在测试下载线路…"))
+            self.update_progress.setValue(0)
+            return
+        self.update_progress.setValue(min(1000, int(done * 1000 / total)))
+        mb = 1024 * 1024
+        speed_text = (
+            f"{speed / mb:.2f} MB" if speed >= mb else f"{speed / 1024:.0f} KB"
+        )
+        self.update_status.setText(
+            i18n.tr("正在下载 {done}/{total} MB · {speed}/s · {source}").format(
+                done=f"{done / mb:.1f}",
+                total=f"{total / mb:.1f}",
+                speed=speed_text,
+                source=source or "—",
+            )
+        )
+
+    def _finish_download_ui(self) -> None:
+        self.update_progress.setVisible(False)
+        self.update_progress.setValue(0)
+        self.cancel_download_btn.setVisible(False)
         self.check_update_btn.setEnabled(True)
+        self.pick_installer_btn.setEnabled(True)
+
+    def _on_download_cancelled(self) -> None:
+        self._finish_download_ui()
+        self.update_status.setText(i18n.tr("已取消下载"))
+
+    def _on_update_downloaded(self, path) -> None:
+        self._finish_download_ui()
         self.update_status.setText(
             i18n.tr("下载完成：{path}").format(path=path)
         )
