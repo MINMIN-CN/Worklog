@@ -1,0 +1,61 @@
+name: 🐛 Bug 反馈 / Bug report
+description: 报告一个可复现的问题 / Report a reproducible problem
+title: "[Bug] "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢反馈！请尽量填写完整，方便快速定位问题。
+        Thanks for reporting! Please fill in as much detail as you can.
+  - type: input
+    id: version
+    attributes:
+      label: 软件版本 / App version
+      description: 在「设置 → 关于与更新」下方查看 / Shown in Settings → About & Updates
+      placeholder: "例如：0.5.2"
+    validations:
+      required: true
+  - type: dropdown
+    id: windows
+    attributes:
+      label: Windows 版本 / Windows version
+      options:
+        - Windows 11
+        - Windows 10
+        - 其他 / Other
+    validations:
+      required: true
+  - type: input
+    id: provider
+    attributes:
+      label: AI 服务商 / AI provider
+      description: 不涉及 AI 的问题可留空 / Leave blank if not AI-related
+      placeholder: "DeepSeek / 通义千问 / 智谱 / Ollama / 其他"
+    validations:
+      required: false
+  - type: textarea
+    id: description
+    attributes:
+      label: 问题描述 / Describe the bug
+      description: 发生了什么？你期望的结果是什么？/ What happened? What did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤 / Steps to reproduce
+      value: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: 截图或日志 / Screenshots or logs
+      description: 可直接拖入截图；若应用启动失败，安装目录下的 `worklog_error.log` 很有帮助 / Drag in screenshots; `worklog_error.log` in the install directory helps for startup failures
+    validations:
+      required: false
