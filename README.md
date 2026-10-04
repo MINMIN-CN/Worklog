@@ -2,6 +2,11 @@
 
 **简体中文** | [English](README.en.md)
 
+[![Release](https://img.shields.io/github/v/release/MINMIN-CN/Worklog?label=release&color=blue)](https://github.com/MINMIN-CN/Worklog/releases/latest)
+[![CI](https://github.com/MINMIN-CN/Worklog/actions/workflows/ci.yml/badge.svg)](https://github.com/MINMIN-CN/Worklog/actions/workflows/ci.yml)
+[![License](https://img.shields.io/github/license/MINMIN-CN/Worklog)](LICENSE)
+[![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6)](#)
+
 本地优先的 AI 工作记录与日报助手，Windows 桌面版。参考 B 站「小黑日报助手」的核心工作流自己实现：
 
 > 自动记录工作轨迹 → AI 理解内容 → 生成日报 / 周报 / 月报 → 提取待办 → 接入自己的 Agent
@@ -21,6 +26,18 @@
 | 本地 Agent API | 127.0.0.1 上的 HTTP 接口，可读时间线/统计/报告，也可写入记录和待办 |
 | 系统托盘 | 关闭窗口自动最小化到托盘继续记录，可随时暂停/继续/立即记录 |
 | 语言 | 简体中文 / English，默认跟随系统，可在设置中切换（重启生效）；安装向导同样自动匹配系统语言 |
+
+## 界面预览
+
+![今日工作](docs/images/zh_today.png)
+
+| 统计 | 报告 |
+| --- | --- |
+| ![统计](docs/images/zh_stats.png) | ![报告](docs/images/zh_reports.png) |
+
+| 待办 | 设置 |
+| --- | --- |
+| ![待办](docs/images/zh_todos.png) | ![设置](docs/images/zh_settings.png) |
 
 ## 快速开始
 
@@ -139,24 +156,38 @@ https://github.com/MINMIN-CN/Worklog/releases/latest/download/manifest.json
 
 ```json
 {
-  "version": "0.4.0",
-  "url": "https://你的地址/WorkLog-Setup-0.4.0.exe",
+  "version": "1.2.3",
+  "url": "https://你的地址/WorkLog-Setup-1.2.3.exe",
   "notes": "更新说明，可省略"
 }
 ```
 
 ### 发布新版本（开发者）
 
-1. 改版本号后运行 `packaging\build.bat` 生成安装包
-2. 更新 `update/manifest.json`（version、url、notes）
-3. 用 GitHub CLI 发布 Release，把安装包和 manifest 作为资源上传：
+1. 更新版本号（自动同步 pyproject、`worklog/__init__.py`、安装脚本、版本信息、更新清单和 README）：
 
 ```bat
-gh release create v0.5.2 "dist\installer\WorkLog-Setup-0.5.2.exe" "update\manifest.json" ^
-  --title "工作小记 v0.5.1" --notes "更新说明"
+uv run python tools/bump_version.py 0.6.0
 ```
 
-4. 应用会自动通过 `releases/latest/download/manifest.json` 发现新版本。
+2. 更新 `update/manifest.json` 的 `notes`，并在 [CHANGELOG.md](CHANGELOG.md) 里记录本版本改动
+3. 提交、打标签并推送，GitHub Actions 的 Release 工作流会自动构建安装包并发布：
+
+```bat
+git add -A
+git commit -m "v0.6.0：更新说明"
+git tag v0.6.0
+git push origin main --tags
+```
+
+也可以在本地手动构建发布：运行 `packaging\build.bat`，然后
+
+```bat
+gh release create v0.6.0 "dist\installer\WorkLog-Setup-0.6.0.exe" update\manifest.json ^
+  --title "工作小记 v0.6.0" --notes "更新说明"
+```
+
+4. 发布后应用会自动通过 `releases/latest/download/manifest.json` 发现新版本。
 
 ## 数据与备份
 
@@ -244,3 +275,7 @@ packaging\build.bat
 - 升级安装时若发现旧版数据（`%LOCALAPPDATA%\WorkLog\data`）会自动迁移
 
 > 首次运行安装包时，火绒/Windows Defender 可能对 PyInstaller 打包的程序弹窗询问，选择允许即可。
+
+---
+
+[更新日志](CHANGELOG.md) · [贡献指南](CONTRIBUTING.md) · [安全政策](SECURITY.md) · [行为准则](CODE_OF_CONDUCT.md) · [Apache-2.0 许可证](LICENSE)

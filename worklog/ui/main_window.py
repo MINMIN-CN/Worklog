@@ -19,7 +19,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .. import APP_NAME, __version__, i18n
+from .. import __version__, i18n
 from ..config import DATA_DIR
 from ..updater import (
     download_installer,

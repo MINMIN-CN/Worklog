@@ -2,8 +2,8 @@
 
 更新清单（JSON）示例：
 {
-  "version": "0.3.0",
-  "url": "https://example.com/WorkLog-Setup-0.3.0.exe",
+  "version": "1.2.3",
+  "url": "https://example.com/WorkLog-Setup-1.2.3.exe",
   "notes": "更新说明（可选）"
 }
 清单地址可以是 http(s) 链接，也可以是本机文件路径。
@@ -16,7 +16,12 @@ import os
 import subprocess
 import sys
 import tempfile
+import threading
+import time
+from collections import deque
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from urllib.parse import urlparse
 
 import httpx
 
@@ -79,12 +84,6 @@ def fetch_manifest(source: str) -> dict:
         raise ValueError(i18n.tr("更新清单格式不正确，需要包含 version 和 url 字段"))
     return data
 
-
-import threading
-import time
-from collections import deque
-from concurrent.futures import ThreadPoolExecutor
-from urllib.parse import urlparse
 
 # GitHub 加速前缀：下载前自动并发测速，选最快线路；如有失败自动切换。
 # 可在 config.json 的 update.mirror_prefixes 或更新清单的 mirror_prefixes 中覆盖/补充。

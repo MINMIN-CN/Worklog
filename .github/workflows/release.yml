@@ -1,0 +1,107 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "版本号（如 0.5.3）。留空则使用仓库当前版本，仅构建不发布。"
+        required: false
+        default: ""
+      publish:
+        description: "构建后创建 GitHub Release"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v10.2.0
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: Resolve version
+        id: ver
+        shell: pwsh
+        run: |
+          if ($env:GITHUB_REF -like "refs/tags/v*") {
+            $version = $env:GITHUB_REF.Substring("refs/tags/v".Length)
+          } elseif ("${{ inputs.version }}" -ne "") {
+            $version = "${{ inputs.version }}".TrimStart("v", "V")
+          } else {
+            $version = (Select-String -Path pyproject.toml -Pattern '^version = "(.+)"$').Matches[0].Groups[1].Value
+          }
+          if ($version -notmatch "^\d+\.\d+\.\d+$") {
+            throw "版本号格式不正确：$version"
+          }
+          Write-Host "版本：$version"
+          "version=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Check version consistency
+        shell: pwsh
+        run: uv run python tools/check_version.py "${{ steps.ver.outputs.version }}"
+
+      - name: Generate icon
+        run: uv run python packaging/make_icon.py
+
+      - name: Build with PyInstaller
+        run: uv run python -m PyInstaller packaging/worklog.spec --noconfirm --clean
+
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress -y
+
+      - name: Build installer
+        shell: pwsh
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DUseChinese=1 packaging\installer.iss
+
+      - name: Generate update manifest
+        shell: pwsh
+        run: |
+          $version = "${{ steps.ver.outputs.version }}"
+          $manifest = Get-Content update/manifest.json -Raw -Encoding utf8 | ConvertFrom-Json
+          $manifest.version = $version
+          $manifest.url = "https://github.com/${{ github.repository }}/releases/download/v$version/WorkLog-Setup-$version.exe"
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          $json = $manifest | ConvertTo-Json -Depth 5
+          [System.IO.File]::WriteAllText(
+            (Join-Path $PWD "dist\manifest.json"),
+            $json,
+            (New-Object System.Text.UTF8Encoding($false))
+          )
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: WorkLog-Setup-${{ steps.ver.outputs.version }}
+          path: |
+            dist/installer/WorkLog-Setup-*.exe
+            dist/manifest.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Create GitHub release
+        if: startsWith(github.ref, 'refs/tags/v') || inputs.publish
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $version = "${{ steps.ver.outputs.version }}"
+          gh release create "v$version" `
+            "dist/installer/WorkLog-Setup-$version.exe" `
+            "dist/manifest.json" `
+            --title "工作小记 v$version" `
+            --generate-notes

@@ -264,7 +264,7 @@ EN: dict[str, str] = {
     "OpenAI（ChatGPT）": "OpenAI (ChatGPT)",
     "本地 Ollama（离线免费）": "Local Ollama (offline, free)",
     "自定义（手动填写接口）": "Custom (manual setup)",
-    "官方 API 已原生支持图片输入，国内直连、价格便宜；在 platform.deepseek.com 创建 API Key。": "The official API supports image input natively. Fast access from China and inexpensive; create an API key at platform.deepseek.com.",
+    "官方 API 已原生支持图片输入，国内直连、价格便宜；在 platform.deepseek.com 创建 API Key。默认关闭思考模式（可在高级设置中开启），避免报告生成时输出被思考占用。": "The official API supports image input natively. Fast access from China and inexpensive; create an API key at platform.deepseek.com. Thinking mode is off by default (enable it in Advanced settings) so reports are never cut off by reasoning.",
     "在阿里云百炼控制台创建 API Key，新用户一般有免费额度，国内速度稳定。": "Create an API key in the Alibaba Cloud Model Studio console. New users usually get free quota, and speeds in China are stable.",
     "在 open.bigmodel.cn 创建 API Key；glm-4.5-flash 文本模型目前免费。": "Create an API key at open.bigmodel.cn; the glm-4.5-flash text model is currently free.",
     "在 siliconflow.cn 创建 API Key，注册通常送额度，国内可选模型多、便宜。": "Create an API key at siliconflow.cn. Sign-up usually includes free credit, with many affordable models available in China.",

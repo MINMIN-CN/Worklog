@@ -18,3 +18,9 @@ worklog_error.log
 .vscode/
 .DS_Store
 Thumbs.db
+
+# 工具缓存
+.ruff_cache/
+.pytest_cache/
+.mypy_cache/
+*.log

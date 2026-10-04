@@ -1,6 +1,11 @@
 # WorkLog (工作小记)
 [简体中文](README.md) | **English**
 
+[![Release](https://img.shields.io/github/v/release/MINMIN-CN/Worklog?label=release&color=blue)](https://github.com/MINMIN-CN/Worklog/releases/latest)
+[![CI](https://github.com/MINMIN-CN/Worklog/actions/workflows/ci.yml/badge.svg)](https://github.com/MINMIN-CN/Worklog/actions/workflows/ci.yml)
+[![License](https://img.shields.io/github/license/MINMIN-CN/Worklog)](LICENSE)
+[![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6)](#)
+
 A local-first AI work journal and daily-report assistant for Windows desktop. Independently built, using the core workflow of Bilibili's "小黑日报助手" (Xiaohei Daily Report Assistant) as a reference:
 
 > Auto-track your work → AI understands the content → generate daily / weekly / monthly reports → extract to-dos → connect your own Agent
@@ -20,6 +25,18 @@ Screenshots live only in memory for a single AI analysis and **are destroyed imm
 | Local Agent API | HTTP endpoints on 127.0.0.1 that read the timeline / stats / reports and also write records and to-dos |
 | System tray | Closing the window minimizes it to the tray and recording continues; pause / resume / capture now at any time |
 | UI language | Simplified Chinese / English; follows the system by default and can be switched in settings (takes effect after restart); the installer wizard also matches the system language automatically |
+
+## Screenshots
+
+![Today](docs/images/en_today.png)
+
+| Stats | Report |
+| --- | --- |
+| ![Stats](docs/images/en_stats.png) | ![Report](docs/images/en_reports.png) |
+
+| To-dos | Settings |
+| --- | --- |
+| ![To-dos](docs/images/en_todos.png) | ![Settings](docs/images/en_settings.png) |
 
 ## Quick start
 
@@ -138,21 +155,35 @@ Update manifest format:
 
 ```json
 {
-  "version": "0.4.0",
-  "url": "https://your-host/WorkLog-Setup-0.4.0.exe",
+  "version": "1.2.3",
+  "url": "https://your-host/WorkLog-Setup-1.2.3.exe",
   "notes": "Release notes, optional"
 }
 ```
 
 ### Publishing a new version (developers)
 
-1. Bump the version number, then run `packaging\build.bat` to build the installer
-2. Update `update/manifest.json` (version, url, notes)
-3. Publish a Release with the GitHub CLI, uploading the installer and manifest as assets:
+1. Bump the version (this syncs pyproject, `worklog/__init__.py`, the installer script, version info, the update manifest and the READMEs):
 
 ```bat
-gh release create v0.5.2 "dist\installer\WorkLog-Setup-0.5.2.exe" "update\manifest.json" ^
-  --title "WorkLog v0.5.0" --notes "Release notes"
+uv run python tools/bump_version.py 0.6.0
+```
+
+2. Update `notes` in `update/manifest.json` and add an entry to [CHANGELOG.md](CHANGELOG.md)
+3. Commit, tag and push — the GitHub Actions **Release** workflow builds the installer and publishes it automatically:
+
+```bat
+git add -A
+git commit -m "v0.6.0: release notes"
+git tag v0.6.0
+git push origin main --tags
+```
+
+You can also build and publish locally: run `packaging\build.bat`, then
+
+```bat
+gh release create v0.6.0 "dist\installer\WorkLog-Setup-0.6.0.exe" update\manifest.json ^
+  --title "WorkLog v0.6.0" --notes "Release notes"
 ```
 
 4. The app will automatically discover the new version via `releases/latest/download/manifest.json`.
@@ -242,3 +273,7 @@ Output: `dist\installer\WorkLog-Setup-0.5.2.exe`. Installer features:
 - During an upgrade install, data from an older version (`%LOCALAPPDATA%\WorkLog\data`) is migrated automatically
 
 > The first time you run the installer, Huorong/Windows Defender may prompt about the PyInstaller-packaged program; just choose Allow.
+
+---
+
+[Changelog](CHANGELOG.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [Code of Conduct](CODE_OF_CONDUCT.md) · [Apache-2.0 License](LICENSE)

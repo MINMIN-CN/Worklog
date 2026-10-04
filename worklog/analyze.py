@@ -6,7 +6,7 @@ import json
 from datetime import datetime
 
 from . import i18n, prompts_en
-from .ai import AIClient, AIError, parse_json_list_loose, parse_json_loose
+from .ai import AIClient, parse_json_list_loose, parse_json_loose
 from .capture import Capture, to_data_url
 
 CATEGORIES = [

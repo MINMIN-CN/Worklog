@@ -25,7 +25,7 @@ from worklog.config import Config, ensure_dirs  # noqa: E402
 from worklog.context import AppContext  # noqa: E402
 from worklog.db import Database  # noqa: E402
 from worklog.recorder import RecorderEngine  # noqa: E402
-from worklog.reporting import DEFAULT_TEMPLATES, all_default_templates  # noqa: E402
+from worklog.reporting import all_default_templates  # noqa: E402
 
 CJK = re.compile(r"[\u4e00-\u9fff]")
 
@@ -58,16 +58,23 @@ i18n.set_language("en")
 engine = RecorderEngine(cfg, db)
 ctx = AppContext(cfg=cfg, db=db, engine=engine, api=None)
 
-from worklog.ui.main_window import MainWindow  # noqa: E402
 from worklog.ui.dialogs import RecordEditDialog  # noqa: E402
+from worklog.ui.main_window import MainWindow  # noqa: E402
 
 window = MainWindow(ctx)
 window.show()
 
 found: list[tuple[str, str]] = []
 
+# 有意保留中文的文案：语言名称按母语显示
+IGNORED = {"简体中文"}
 
-def scan(widget, path: str) -> None:
+
+def has_cjk(value: str) -> bool:
+    return bool(value) and value not in IGNORED and bool(CJK.search(value))
+
+
+def inspect(widget, path: str) -> None:
     from PySide6.QtWidgets import (
         QAbstractButton,
         QComboBox,
@@ -87,18 +94,27 @@ def scan(widget, path: str) -> None:
         text = widget.placeholderText()
     elif isinstance(widget, QGroupBox):
         text = widget.title()
-    if text and CJK.search(text) and "<" not in text:
-        found.append((path, text[:60]))
+    if text and has_cjk(text) and "<" not in text:
+        found.append((path, text[:80]))
     if isinstance(widget, QComboBox):
         for index in range(widget.count()):
             item = widget.itemText(index)
-            if CJK.search(item):
-                found.append((f"{path}[combo]", item[:60]))
+            if has_cjk(item):
+                found.append((f"{path}[combo]", item[:80]))
     if isinstance(widget, QListWidget):
         for row in range(widget.count()):
             item = widget.item(row).text()
-            if CJK.search(item):
-                found.append((f"{path}[list]", item[:60]))
+            if has_cjk(item):
+                found.append((f"{path}[list]", item[:80]))
+
+
+def scan(root, path: str) -> None:
+    """递归扫描控件树（含所有子控件）。"""
+    from PySide6.QtWidgets import QWidget
+
+    inspect(root, path)
+    for child in root.findChildren(QWidget):
+        inspect(child, f"{path}/{type(child).__name__}")
 
 
 for index in range(window.stack.count()):
@@ -112,14 +128,23 @@ scan(window, "MainWindow")
 
 dialog = RecordEditDialog(None, window)
 scan(dialog, "RecordEditDialog")
+dialog.deleteLater()
 
-dialog_window = window.reports_page
 # 报告页状态、待办行、菜单等
 i18n.translate_menu(window.tray_menu)
 for action in window.tray_menu.actions():
     if CJK.search(action.text()):
         found.append(("tray", action.text()))
 
-for path, text in found:
-    print(f"  [{path}] {text}")
-print(f"\n共 {len(found)} 处中文残留（英文模式）")
+window._really_quit = True
+window.tray.hide()
+window.close()
+
+if found:
+    for path, text in found:
+        print(f"  [{path}] {text}")
+    print(f"\n共 {len(found)} 处中文残留（英文模式），请补充到 worklog/_catalog_en.py")
+    raise SystemExit(1)
+
+print("英文模式无中文残留。")
+raise SystemExit(0)

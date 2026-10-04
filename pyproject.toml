@@ -11,10 +11,25 @@ dependencies = [
     "httpx>=0.27.0",
 ]
 
+[project.urls]
+Homepage = "https://github.com/MINMIN-CN/Worklog"
+Repository = "https://github.com/MINMIN-CN/Worklog"
+Releases = "https://github.com/MINMIN-CN/Worklog/releases"
+Issues = "https://github.com/MINMIN-CN/Worklog/issues"
+Changelog = "https://github.com/MINMIN-CN/Worklog/blob/main/CHANGELOG.md"
+
 [dependency-groups]
 dev = [
     "pyinstaller>=6.10",
+    "ruff>=0.16",
 ]
 
 [tool.uv]
 package = false
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I", "W"]

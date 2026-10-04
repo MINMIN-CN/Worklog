@@ -17,7 +17,6 @@ from .ui.main_window import MainWindow
 from .ui.theme import QSS
 from .ui.widgets import make_icon
 
-
 _MUTEX_HANDLES: list = []
 
 

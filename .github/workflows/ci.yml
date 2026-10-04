@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v10.2.0
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: Check version consistency
+        run: uv run python tools/check_version.py
+
+      - name: Lint
+        run: uv run ruff check .
+
+      - name: Run tests
+        shell: pwsh
+        run: |
+          uv run python tools/smoke_test.py
+          uv run python tools/flow_test.py
+          uv run python tools/app_start_test.py
+          uv run python tools/updater_flow_test.py
+          uv run python tools/i18n_coverage.py
+          uv run python tools/report_click_test.py

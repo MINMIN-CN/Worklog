@@ -10,8 +10,6 @@ import os
 import sys
 import tempfile
 import threading
-import urllib.request
-from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 

@@ -19,8 +19,8 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from worklog.updater import (  # noqa: E402
-    DownloadCancelled,
     GITHUB_MIRROR_PREFIXES,
+    DownloadCancelled,
     build_download_candidates,
     download_installer,
     fetch_manifest,
@@ -177,7 +177,10 @@ def test_download_cancel() -> None:
 
 
 def main() -> int:
-    assert INSTALLER.exists(), f"缺少安装包：{INSTALLER}（先运行 packaging\\build.bat）"
+    if INSTALLER.exists():
+        print(f"（使用真实安装包：{INSTALLER.name}）")
+    else:
+        print("（未找到本地安装包，使用内置模拟数据）")
     server = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
     threading.Thread(target=server.serve_forever, daemon=True).start()
 

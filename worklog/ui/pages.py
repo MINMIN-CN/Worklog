@@ -5,13 +5,11 @@ from __future__ import annotations
 import json
 import os
 import sys
-import time
 from datetime import date, timedelta
 from pathlib import Path
 
-from PySide6.QtCore import QDate, QProcess, Qt, Signal
+from PySide6.QtCore import QDate, QProcess, Qt, QUrl, Signal
 from PySide6.QtGui import QDesktopServices
-from PySide6.QtCore import QUrl
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -38,9 +36,9 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .. import APP_NAME, __version__, i18n
+from .. import __version__, i18n
 from ..ai import AIClient, make_client
-from ..analyze import CATEGORIES, extract_todos
+from ..analyze import extract_todos
 from ..config import DATA_DIR, PROJECT_ROOT, REPORTS_DIR
 from ..providers import all_providers, match_provider, provider_by_key
 from ..reporting import build_timeline_text, generate_report, kind_label, range_for
@@ -64,7 +62,6 @@ from .widgets import (
     TagCloudWidget,
     Task,
     fmt_time,
-    refresh_style,
 )
 
 
