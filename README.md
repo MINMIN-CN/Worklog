@@ -25,6 +25,7 @@
 | 待办 | 手动添加或让 AI 从某天时间线中提取，支持截止日期与完成状态 |
 | 本地 Agent API | 127.0.0.1 上的 HTTP 接口，可读时间线/统计/报告，也可写入记录和待办 |
 | 系统托盘 | 关闭窗口自动最小化到托盘继续记录，可随时暂停/继续/立即记录 |
+| 开机自启 | 安装版可在设置中随时开关；登录后静默进入托盘后台记录（安装时也可勾选） |
 | 语言 | 简体中文 / English，默认跟随系统，可在设置中切换（重启生效）；安装向导同样自动匹配系统语言 |
 
 ## 界面预览
@@ -264,7 +265,7 @@ packaging\build.bat
 
 它会依次：生成图标 → PyInstaller 打包（onedir，输出 `dist\WorkLog\`）→ Inno Setup 生成安装包。
 
-产物：`dist\installer\WorkLog-Setup-0.5.2.exe`，安装包特性：
+产物：`dist\installer\WorkLog-Setup-0.5.3.exe`，安装包特性：
 
 - 默认按用户安装（无需管理员权限），路径 `%LOCALAPPDATA%\Programs\工作小记`
 - 安装向导支持**简体中文 / English**，自动匹配系统语言

@@ -24,6 +24,7 @@ Screenshots live only in memory for a single AI analysis and **are destroyed imm
 | To-dos | Add them manually, or let AI extract them from a day's timeline; supports due dates and completion status |
 | Local Agent API | HTTP endpoints on 127.0.0.1 that read the timeline / stats / reports and also write records and to-dos |
 | System tray | Closing the window minimizes it to the tray and recording continues; pause / resume / capture now at any time |
+| Auto-start | Toggle it in settings (installed build); starts silently to the tray after Windows sign-in (can also be chosen during installation) |
 | UI language | Simplified Chinese / English; follows the system by default and can be switched in settings (takes effect after restart); the installer wizard also matches the system language automatically |
 
 ## Screenshots
@@ -262,7 +263,7 @@ packaging\build.bat
 
 It runs in sequence: generate icons → PyInstaller packaging (onedir, output to `dist\WorkLog\`) → Inno Setup to build the installer.
 
-Output: `dist\installer\WorkLog-Setup-0.5.2.exe`. Installer features:
+Output: `dist\installer\WorkLog-Setup-0.5.3.exe`. Installer features:
 
 - Per-user install by default (no administrator rights required), at `%LOCALAPPDATA%\Programs\工作小记`
 - The installer wizard supports **Simplified Chinese / English** and matches the system language automatically

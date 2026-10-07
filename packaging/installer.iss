@@ -2,7 +2,7 @@
 ; 构建：packaging\build.bat（或 ISCC.exe /DUseChinese=1 packaging\installer.iss）
 
 #define MyAppName "工作小记"
-#define MyAppVersion "0.5.2"
+#define MyAppVersion "0.5.3"
 #define MyAppExeName "WorkLog.exe"
 #define MyAppId "{{B7E4A2F1-3C6D-4E8B-9A5F-1D2C3B4A5E6F}"
 #define MyAppIdPlain "{B7E4A2F1-3C6D-4E8B-9A5F-1D2C3B4A5E6F}"
@@ -225,6 +225,10 @@ var
 begin
   if CurUninstallStep = usUninstall then
   begin
+    { 清理应用内「开机自动启动」开关写入的注册表项，以及旧版启动文件夹快捷方式 }
+    RegDeleteValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Run', 'WorkLog');
+    DeleteFile(ExpandConstant('{userstartup}\{#MyAppName}.lnk'));
+
     DataDir := ExpandConstant('{app}\data');
     if DirExists(DataDir) then
     begin

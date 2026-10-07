@@ -29,6 +29,7 @@ from PIL import Image  # noqa: E402
 from PySide6.QtCore import QCoreApplication, QEvent, Qt  # noqa: E402
 from PySide6.QtWidgets import QApplication  # noqa: E402
 
+from worklog import autostart as autostart_module  # noqa: E402
 from worklog import i18n  # noqa: E402
 from worklog.config import Config, ensure_dirs  # noqa: E402
 from worklog.context import AppContext  # noqa: E402
@@ -216,6 +217,9 @@ def seed(db: Database) -> None:
 
 
 def main() -> int:
+    # README 截图展示安装版效果：让「开机自动启动」开关处于可用状态
+    autostart_module.installed_command = lambda: '"C:\\Program Files\\WorkLog\\WorkLog.exe" --minimized'
+
     app = QApplication.instance() or QApplication(sys.argv)
     app.setStyleSheet(QSS)
     ensure_dirs()
@@ -232,6 +236,7 @@ def main() -> int:
     window.resize(1240, 820)
     window.setAttribute(Qt.WA_DontShowOnScreen, True)
     window.show()
+    window.settings_page.autostart_check.setChecked(False)
 
     def flush() -> None:
         # 处理延迟删除，避免重建列表时留下旧卡片残影

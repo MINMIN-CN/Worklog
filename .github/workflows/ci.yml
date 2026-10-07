@@ -41,6 +41,8 @@ jobs:
           uv run python tools/smoke_test.py
           uv run python tools/flow_test.py
           uv run python tools/app_start_test.py
+          uv run python tools/minimized_start_test.py
           uv run python tools/updater_flow_test.py
+          uv run python tools/autostart_test.py
           uv run python tools/i18n_coverage.py
           uv run python tools/report_click_test.py

@@ -36,7 +36,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .. import __version__, i18n
+from .. import __version__, autostart, i18n
 from ..ai import AIClient, make_client
 from ..analyze import extract_todos
 from ..config import DATA_DIR, PROJECT_ROOT, REPORTS_DIR
@@ -1096,11 +1096,17 @@ class SettingsPage(QWidget):
         self.excluded_edit.setPlaceholderText("每行一个进程名，例如 Chrome.exe")
         self.auto_start_check = QCheckBox("启动应用后自动开始记录")
         self.auto_start_check.setChecked(bool(cfg.get("recording", "auto_start", default=True)))
+        self.autostart_check = QCheckBox("开机自动启动（登录后自动进入托盘）")
+        self.autostart_check.setChecked(autostart.is_enabled())
+        if not autostart.is_supported():
+            self.autostart_check.setEnabled(False)
+            self.autostart_check.setToolTip(i18n.tr("仅安装版可用"))
         capture_form.addRow("截屏间隔", self.interval_spin)
         capture_form.addRow("截屏范围", self.monitor_combo)
         capture_form.addRow("空闲多久后暂停", self.idle_spin)
         capture_form.addRow("排除的应用", self.excluded_edit)
         capture_form.addRow("", self.auto_start_check)
+        capture_form.addRow("", self.autostart_check)
         capture_card.add_layout(capture_form)
         layout.addWidget(capture_card)
 
@@ -1416,6 +1422,20 @@ class SettingsPage(QWidget):
             return
         QApplication.quit()
 
+    def _apply_autostart(self) -> None:
+        wanted = self.autostart_check.isChecked()
+        if not autostart.is_supported() or wanted == autostart.is_enabled():
+            return
+        try:
+            autostart.set_enabled(wanted)
+        except (OSError, RuntimeError) as exc:
+            self.autostart_check.setChecked(autostart.is_enabled())
+            QMessageBox.warning(
+                self,
+                i18n.tr("保存设置"),
+                i18n.tr("设置开机自启动失败：{message}").format(message=exc),
+            )
+
     def _save(self) -> None:
         excluded = [
             line.strip()
@@ -1424,6 +1444,7 @@ class SettingsPage(QWidget):
         ]
         previous_language = self.ctx.cfg.get("ui", "language", default="auto")
         new_language = self.language_combo.currentData() or "auto"
+        self._apply_autostart()
         self.ctx.cfg.update(
             {
                 "ui": {"language": new_language},

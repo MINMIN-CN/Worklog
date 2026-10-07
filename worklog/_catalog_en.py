@@ -355,5 +355,10 @@ EN.update(
         "模型把输出预算都用在思考上了（未返回内容）。请在设置 → 高级设置中关闭「思考模式」后重试。": "The model spent the whole output budget on reasoning and returned no content. Turn off \"Thinking mode\" in Settings → Advanced and try again.",
         "模型返回了空内容，请重试或在设置中调整模型。": "The model returned empty content. Please retry or adjust the model in Settings.",
         "模型输出被截断（可能把预算用在思考上），已自动重试…": "Model output was truncated (likely spent on reasoning); retrying automatically…",
+        # v0.5.3：开机自启动
+        "开机自动启动（登录后自动进入托盘）": "Start with Windows (opens to tray)",
+        "仅安装版可用": "Available in the installed version only",
+        "设置开机自启动失败：{message}": "Could not change the start-on-boot setting: {message}",
+        "已在后台开始记录，可在系统托盘查看。": "Recording in the background — check the system tray.",
     }
 )

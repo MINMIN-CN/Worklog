@@ -71,8 +71,12 @@ def main() -> int:
     # 单实例提示出现在读取配置之前，先按系统语言初始化
     i18n.set_language(i18n.detect_system_language())
     wait_instance = "--wait-instance" in sys.argv
-    if wait_instance:
-        sys.argv = [argument for argument in sys.argv if argument != "--wait-instance"]
+    minimized = "--minimized" in sys.argv
+    sys.argv = [
+        argument
+        for argument in sys.argv
+        if argument not in ("--wait-instance", "--minimized")
+    ]
     if not _single_instance_guard(20.0 if wait_instance else 0.0):
         return 0
 
@@ -103,7 +107,17 @@ def main() -> int:
 
     ctx = AppContext(cfg=cfg, db=db, engine=engine, api=api)
     window = MainWindow(ctx)
-    window.show()
+    if minimized:
+        # 开机自启：静默进入托盘后台记录，不弹出主窗口
+        window.hide()
+        window.tray.showMessage(
+            APP_NAME,
+            i18n.tr("已在后台开始记录，可在系统托盘查看。"),
+            make_icon(),
+            4000,
+        )
+    else:
+        window.show()
 
     code = app.exec()
 
