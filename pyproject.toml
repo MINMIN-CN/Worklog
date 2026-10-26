@@ -21,7 +21,7 @@ Changelog = "https://github.com/MINMIN-CN/Worklog/blob/main/CHANGELOG.md"
 [dependency-groups]
 dev = [
     "pyinstaller>=6.10",
-    "ruff>=0.16",
+    "ruff>=0.17.2",
 ]
 
 [tool.uv]
